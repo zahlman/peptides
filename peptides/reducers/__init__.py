@@ -3,6 +3,7 @@ from functools import wraps as _wraps, partial as _partial
 # Example code replacing the builtin `min`, `max`, `any`, `all` and `sum`
 # functions to allow them to rely on dunder methods.
 _original = {
+    'len': len, # for range patch
     'min': min, 'max': max, 'any': any, 'all': all, 'sum': sum
 }
 
@@ -27,6 +28,71 @@ def _get(name, x):
 
 def _invoke(name, x):
     return _get(name, x)(x)
+
+
+# patch len() for ranges
+def len(x):
+    try:
+        return _original['len'](x)
+    except OverflowError:
+        if not isinstance(x, range):
+            raise
+        result, remainder = divmod(x.stop - x.start, x.step)
+        if remainder != 0:
+            result += 1
+        return max(result, 0) # max() just in case
+
+
+# helper for range reducers
+def _add_stepcount(func):
+    @_wraps(func)
+    def wrapper(a_range):
+        size = len(a_range)
+        if size == 0:
+            raise ValueError(f'{func.__name__}() of empty range')
+        return func(a_range, size - 1)
+    return wrapper
+
+
+# min
+@_register(range)
+@_add_stepcount
+def min(a_range, stepcount):
+    start, step = a_range.start, a_range.step
+    return start + (0 if step > 0 else step * stepcount)
+
+
+# max
+@_register(range)
+@_add_stepcount
+def max(a_range, stepcount):
+    start, step = a_range.start, a_range.step
+    return start + (0 if step < 0 else step * stepcount)
+
+
+# any
+@_register(range)
+def any(a_range):
+    # Range elements are distinct. So if there are at least two elements,
+    # then one must be non-zero. If there is one, it must be the `.start`.
+    count = len(a_range)
+    return count > 1 or (count == 1 and a_range.start != 0)
+
+
+# all
+@_register(range)
+def all(a_range):
+    return 0 not in a_range
+
+
+# sum
+@_register(range)
+@_add_stepcount
+def sum(a_range, stepcount):
+    first = a_range.start
+    last = first + (a_range.step * stepcount)
+    # Gauss' method.
+    return (first + last) * (stepcount + 1) // 2
 
 
 # Now that special implementations are registered, provide the names again.
