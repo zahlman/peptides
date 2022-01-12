@@ -19,27 +19,22 @@ class _Pattern:
 
 
     @staticmethod
-    def from_step(step):
-        assert isinstance(step, int)
-        if step == 0:
-            raise ValueError('step cannot be zero')
-        return _Pattern(abs(step), 1)
-
-
-    @staticmethod
-    def from_value(value):
-        assert isinstance(value, int) and value > 1
-        size = value.bit_length() - 1
-        return _Pattern(size, value - (1 << size))
-
-
-    @staticmethod
-    def from_string(s):
-        return _Pattern(len(s), int(s[::-1], 2))
+    def create(step):
+        if isinstance(step, int):
+            if step == 0:
+                raise ValueError('step cannot be zero')
+            return _Pattern(abs(step), 1)
+        elif isinstance(step, str):
+            # Avoid 0b prefixes.
+            if any(c not in '01' for c in step):
+                raise ValueError('invalid pattern string')
+            return _Pattern(len(step), int(step[::-1], 2))
+        else:
+            raise TypeError('pattern must be int or string')
 
 
     def __repr__(self):
-        return f'{self.__class__.__qualname__}.from_string({self!r})'
+        return f'{self.__class__.__qualname__}.create({str(self)!r})'
 
 
     def __str__(self):
@@ -144,43 +139,40 @@ class _Range:
         return self._pattern[distance]
 
 
-Z = _Range(-Inf, Inf, _Pattern.from_step(1))
-    
-    
 def range(*args):
-    """range(stop) -> range object
+    """range() -> (empty) range object
+    range(stop) -> range object
     range(start, stop[, step]) -> range object
 
     More-or-less-drop-in replacement for built-in `range`.
-    The `stop` value is normalized to be just past the last value in range.
+    Can also be called with zero arguments to produce an empty range.
+    Empty ranges also display specially.
     `step` can instead be a string pattern of ones and zeroes, indicating the
     (repeating) sequence of which values are in the range. In this case,
     the "direction" is inferred from `start` and `stop`."""
     # Unpack the args per built-in `range`.
-    try:
-        start, stop, step = args
-    except ValueError:
-        try:
-            start, stop, step = (*args, 1)
-        except ValueError:
-            start, stop, step = (0, *args, 1)
+    count = len(args)
+    if count > 3:
+        raise TypeError('too many arguments for range() (at most 3 permitted)')
+    start, stop, step = [
+        (0, 0, 1),
+        (0, *args, 1),
+        (*args, 1),
+        args
+    ][len(args)]
     # Do a whole bunch of sanity checks.
     if isinstance(step, int):
-        pattern = _Pattern.from_step(step)
         # Check for empty ranges and normalize.
-        if step < 0 and start < stop:
-            stop = start    
-        if step > 0 and start > stop:
+        if (step < 0 and start < stop) or (step > 0 and start > stop):
             stop = start
-    elif isinstance(step, str):
-        pattern = _Pattern.from_string(step)
-    # FIXME: normalize `stop` for other cases.
-    else:
-        raise TypeError('step must be an integer or string')
+        # TODO: normalize `stop` for other cases?
     if not isinstance(start, (int, _Inf)):
         raise TypeError('start must be an integer or -Inf')
     if start is Inf:
         raise ValueError('start cannot be +Inf')
     if not isinstance(stop, (int, _Inf)):
         raise TypeError('stop must be an integer or +/-Inf')
-    return _Range(start, stop, pattern)
+    return _Range(start, stop, _Pattern.create(step))
+
+
+Z = range(-Inf, Inf, 1)
