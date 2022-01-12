@@ -102,26 +102,59 @@ Inf = _Inf(True)
 class Range:
     """Replacement for builtin `range` that can represent unbounded ranges
     and sequences with fancier patterns."""
-
-
     # Not intended to be called directly.
     # Negative value for `pattern` indicates counting downward.
     # The high bit of the absolute value is ignored; the rest encode a
     # repeating pattern used to mask values starting at `start` and proceeding
     # to `stop`.
-    def __init__(self, start, stop, pattern=3):
-        if start is None:
-            if stop is not None or pattern != 3:
-                raise ValueError("`start` can only be None for Z")
-        if pattern < 0:
-            pattern = -pattern
-            self._direction = -1
+    def __init__(self, start, stop, pattern):
+        # Preprocessing ensures the range is directed from `start` to `stop`,
+        # and that `start` is a definite endpoint except in the Z special case.
+        self._start, self._stop, self._pattern = start, stop, pattern
+        assert isinstance(start, (_Inf, int))
+        assert isinstance(stop, (_Inf, int))
+        assert isinstance(pattern, _Pattern)
+        assert start is not Inf
+        if start is -Inf:
+            if stop is not Inf or str(pattern) != '1':
+                raise ValueError("invalid start point for range")
+            self._size = None
+        elif stop in (Inf, -Inf):
+            self._size = Inf
         else:
-            self._direction = 1
-        self._pattern_length = pattern.bit_length() - 1
-        self._pattern = pattern - (1 << self._pattern_length)
-        self._start = start
-        self._size = None if stop is None else max(0, (stop - start) * self._direction)
+            self._size = abs(start - stop)
+
+
+    @staticmethod
+    def create(*args):
+        # Unpack the args per built-in `range`.
+        try:
+            start, stop, step = args
+        except ValueError:
+            try:
+                start, stop, step = (*args, 1)
+            except ValueError:
+                start, stop, step = (0, *args, 1)
+        # Do a whole bunch of sanity checks.
+        if not isinstance(step, int):
+            raise TypeError('step must be an integer')
+        if step == 0:
+            raise ValueError('step cannot be zero')
+        if not isinstance(start, (int, _Inf)):
+            raise TypeError('start must be an integer or -Inf')
+        if start is Inf:
+            raise ValueError('start cannot be +Inf')
+        if not isinstance(stop, (int, _Inf)):
+            raise TypeError('stop must be an integer or +/-Inf')
+        if step < 0 and start < stop:
+            raise ValueError(
+                'range with negative step must have start >= stop'
+            )
+        if step > 0 and start > stop:
+            raise ValueError(
+                'range with positive step must have start <= stop'
+            )
+        return Range(start, stop, _Pattern.from_step(step))
 
 
     def __contains__(self, value):
@@ -131,12 +164,14 @@ class Range:
             return False
         if as_int != value: # e.g. non-integer float
             return False
-        if self._start is None: # represents all integers
+        if self._start is -Inf: # represents all integers
             return True
-        distance = (value - self._start) * self._direction
-        if self._size is not None and distance >= self._size:
+        # Otherwise, find the corresponding index.
+        start, stop = self._start, self._stop
+        distance = value - start if stop > start else start - value
+        if not 0 <= distance < self._size:
             return False
-        if distance < 0:
-            return False
-        return bool(self._pattern & (1 << (distance % self._pattern_length)))
+        return self._pattern[distance]
 
+
+Z = Range(-Inf, Inf, _Pattern.from_step(1))
