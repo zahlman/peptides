@@ -173,6 +173,12 @@ class _Range:
             yield start + i if stop > start else start - i
 
 
+    def __str__(self):
+        start, stop, p = self._start, self._stop, self._pattern
+        return 'range()' if start == stop else f"range({start}, {stop}, '{p}')"
+    __repr__ = __str__
+
+
 def range(*args):
     """range() -> (empty) range object
     range(stop) -> range object
