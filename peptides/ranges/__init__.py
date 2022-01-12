@@ -20,7 +20,9 @@ class _Pattern:
 
     @staticmethod
     def from_step(step):
-        assert isinstance(step, int) and step != 0
+        assert isinstance(step, int)
+        if step == 0:
+            raise ValueError('step cannot be zero')
         return _Pattern(abs(step), 1)
 
 
@@ -99,7 +101,7 @@ class _Inf:
 Inf = _Inf(True)
 
 
-class Range:
+class _Range:
     """Replacement for builtin `range` that can represent unbounded ranges
     and sequences with fancier patterns."""
     # Not intended to be called directly.
@@ -125,38 +127,6 @@ class Range:
             self._size = abs(start - stop)
 
 
-    @staticmethod
-    def create(*args):
-        # Unpack the args per built-in `range`.
-        try:
-            start, stop, step = args
-        except ValueError:
-            try:
-                start, stop, step = (*args, 1)
-            except ValueError:
-                start, stop, step = (0, *args, 1)
-        # Do a whole bunch of sanity checks.
-        if not isinstance(step, int):
-            raise TypeError('step must be an integer')
-        if step == 0:
-            raise ValueError('step cannot be zero')
-        if not isinstance(start, (int, _Inf)):
-            raise TypeError('start must be an integer or -Inf')
-        if start is Inf:
-            raise ValueError('start cannot be +Inf')
-        if not isinstance(stop, (int, _Inf)):
-            raise TypeError('stop must be an integer or +/-Inf')
-        if step < 0 and start < stop:
-            raise ValueError(
-                'range with negative step must have start >= stop'
-            )
-        if step > 0 and start > stop:
-            raise ValueError(
-                'range with positive step must have start <= stop'
-            )
-        return Range(start, stop, _Pattern.from_step(step))
-
-
     def __contains__(self, value):
         try:
             as_int = int(value)
@@ -174,4 +144,43 @@ class Range:
         return self._pattern[distance]
 
 
-Z = Range(-Inf, Inf, _Pattern.from_step(1))
+Z = _Range(-Inf, Inf, _Pattern.from_step(1))
+    
+    
+def range(*args):
+    """range(stop) -> range object
+    range(start, stop[, step]) -> range object
+
+    More-or-less-drop-in replacement for built-in `range`.
+    The `stop` value is normalized to be just past the last value in range.
+    `step` can instead be a string pattern of ones and zeroes, indicating the
+    (repeating) sequence of which values are in the range. In this case,
+    the "direction" is inferred from `start` and `stop`."""
+    # Unpack the args per built-in `range`.
+    try:
+        start, stop, step = args
+    except ValueError:
+        try:
+            start, stop, step = (*args, 1)
+        except ValueError:
+            start, stop, step = (0, *args, 1)
+    # Do a whole bunch of sanity checks.
+    if isinstance(step, int):
+        pattern = _Pattern.from_step(step)
+        # Check for empty ranges and normalize.
+        if step < 0 and start < stop:
+            stop = start    
+        if step > 0 and start > stop:
+            stop = start
+    elif isinstance(step, str):
+        pattern = _Pattern.from_string(step)
+    # FIXME: normalize `stop` for other cases.
+    else:
+        raise TypeError('step must be an integer or string')
+    if not isinstance(start, (int, _Inf)):
+        raise TypeError('start must be an integer or -Inf')
+    if start is Inf:
+        raise ValueError('start cannot be +Inf')
+    if not isinstance(stop, (int, _Inf)):
+        raise TypeError('stop must be an integer or +/-Inf')
+    return _Range(start, stop, pattern)
