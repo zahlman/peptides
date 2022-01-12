@@ -1,4 +1,7 @@
-from functools import total_ordering as _cmp
+from functools import lru_cache as _cache, total_ordering as _cmp
+
+
+_range = range
 
 
 def _gcd(x, y):
@@ -31,6 +34,26 @@ class _Pattern:
             return _Pattern(len(step), int(step[::-1], 2))
         else:
             raise TypeError('pattern must be int or string')
+
+
+    @property
+    @_cache(None)
+    def indices(self):
+        result = []
+        bits = self._sequence
+        for i in _range(self._count):
+            if bits & 1:
+                result.append(i)
+            bits >>= 1
+        return result
+
+
+    def __iter__(self):
+        base = 0
+        while True:
+            for i in self.indices:
+                yield i + base
+            base += self._count
 
 
     def __repr__(self):
@@ -137,6 +160,14 @@ class _Range:
         if not 0 <= distance < self._size:
             return False
         return self._pattern[distance]
+
+
+    def __iter__(self):
+        start, stop = self._start, self._stop
+        for i in self._pattern:
+            if i >= abs(start - stop):
+                return
+            yield start + i if stop > start else start - i
 
 
 def range(*args):
