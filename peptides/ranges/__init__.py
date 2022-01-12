@@ -1,3 +1,6 @@
+from functools import total_ordering as _cmp
+
+
 def _gcd(x, y):
     x, y = max(x, y), min(x, y)
     while y != 0:
@@ -59,6 +62,41 @@ class _Pattern:
 
     def __getitem__(self, index):
         return bool(self._sequence & (1 << (index % self._count)))
+
+
+@_cmp
+class _Inf:
+    def __new__(cls, sign):
+        if not isinstance(sign, bool):
+            raise TypeError
+        if not hasattr(cls, '_instances'):
+            cls._instances = [
+                super().__new__(cls), super().__new__(cls)
+            ]
+        return cls._instances[sign]
+
+
+    def __init__(self, sign):
+        self._sign = sign
+
+
+    def __neg__(self):
+        return _Inf(not self._sign)
+
+
+    def __gt__(self, other):
+        if not isinstance(other, (_Inf, int)):
+            return NotImplemented
+        return False if self is other else self._sign
+
+
+    def __str__(self):
+        sign = '' if self._sign else '-'
+        return f'{sign}Inf'
+    __repr__ = __str__
+
+
+Inf = _Inf(True)
 
 
 class Range:
