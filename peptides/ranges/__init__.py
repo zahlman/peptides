@@ -38,22 +38,25 @@ class _Pattern:
 
     @property
     @_cache(None)
-    def indices(self):
-        result = []
-        bits = self._sequence
+    def steps(self):
+        result, bits, stride = [], self._sequence, 0 
         for i in _range(self._count):
             if bits & 1:
-                result.append(i)
+                result.append(stride)
+                stride = 0
+            stride += 1
             bits >>= 1
-        return result
+        result.append(stride + result[0])
+        start, *cycle = result
+        return start, cycle
 
 
     def __iter__(self):
-        base = 0
+        value, cycle = self.steps
         while True:
-            for i in self.indices:
-                yield i + base
-            base += self._count
+            for step in cycle:
+                yield value
+                value += step
 
 
     def __repr__(self):
