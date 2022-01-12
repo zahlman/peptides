@@ -16,7 +16,13 @@ class _Pattern:
 
 
     @staticmethod
-    def from_pattern_value(value):
+    def from_step(step):
+        assert isinstance(step, int) and step != 0
+        return _Pattern(abs(step), 1)
+
+
+    @staticmethod
+    def from_value(value):
         assert isinstance(value, int) and value > 1
         size = value.bit_length() - 1
         return _Pattern(size, value - (1 << size))
@@ -28,7 +34,7 @@ class _Pattern:
 
 
     def __repr__(self):
-        return f'_Pattern.from_string({repr(str(self))})'
+        return f'{self.__class__.__qualname__}.from_string({self!r})'
 
 
     def __str__(self):
@@ -49,6 +55,10 @@ class _Pattern:
             return NotImplemented
         size = _lcm(self._count, other._count)
         return _Pattern(size, self._padded_to(size) & other._padded_to(size))
+
+
+    def __getitem__(self, index):
+        return bool(self._sequence & (1 << (index % self._count)))
 
 
 class Range:
