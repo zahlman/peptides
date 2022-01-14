@@ -154,15 +154,10 @@ class _Range:
         # Preprocessing ensures the range is directed from `start` to `stop`,
         # and that `start` is a definite endpoint except in the Z special case.
         self._start, self._stop, self._pattern = start, stop, pattern
-        assert isinstance(start, (_Inf, int))
+        assert isinstance(start, int)
         assert isinstance(stop, (_Inf, int))
         assert isinstance(pattern, _Pattern)
-        assert start is not Inf
-        if start is -Inf:
-            if stop is not Inf or str(pattern) != '1':
-                raise ValueError("invalid start point for range")
-            self._size = None
-        elif stop in (Inf, -Inf):
+        if stop in (Inf, -Inf):
             self._size = Inf
         else:
             self._size = abs(start - stop)
@@ -175,8 +170,6 @@ class _Range:
             return False
         if as_int != value: # e.g. non-integer float
             return False
-        if self._start is -Inf: # represents all integers
-            return True
         # Otherwise, find the corresponding index.
         start, stop = self._start, self._stop
         distance = value - start if stop > start else start - value
@@ -232,16 +225,10 @@ def range(*args):
         if (step < 0 and start < stop) or (step > 0 and start > stop):
             stop = start
         # TODO: normalize `stop` for other cases
-    if not isinstance(start, (int, _Inf)):
-        raise TypeError('start must be an integer or -Inf')
+    if not isinstance(start, int):
+        raise TypeError('start must be an integer')
     pattern, offset = _Pattern.create(step)
-    if start is Inf:
-        raise ValueError('start cannot be +Inf')
-    elif start is not -Inf:
-        start += (offset if stop > start else -offset)
+    start += (offset if stop > start else -offset)
     if not isinstance(stop, (int, _Inf)):
         raise TypeError('stop must be an integer or +/-Inf')
     return _Range(start, stop, pattern)
-
-
-Z = range(-Inf, Inf, 1)
