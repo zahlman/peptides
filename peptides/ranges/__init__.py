@@ -56,12 +56,11 @@ class _Pattern:
     @property
     @_cache(None)
     def steps(self):
-        result, bits, stride = [], self._sequence, 1
-        while bits:
+        result, bits, position = [0], self._sequence, 1
+        while bits != 1: # skip the sentinel.
             if bits & 1:
-                result.append(stride)
-                stride = 0
-            stride += 1
+                result.append(position)
+            position += 1
             bits >>= 1
         return result
 
@@ -69,10 +68,11 @@ class _Pattern:
     def __iter__(self):
         # The 0th value is always in the cycle, due to the normalization.
         value, cycle = 0, self.steps
+        size = self.size
         while True:
             for step in cycle:
                 yield value
-                value += step
+            value += size
 
 
     def __repr__(self):
@@ -162,7 +162,7 @@ class _Range:
             return 'range()'
         if len(p.steps) > 1:
             return f"range({start}, {stop}, '{p}')"
-        size = p.steps[0]
+        size = p.size
         if size > 1:
             step = size if stop > start else -size
             return f'range({start}, {stop}, {step})'
