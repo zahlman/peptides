@@ -104,7 +104,7 @@ class _Pattern:
         return _Pattern(self._padded_to(size) & other._padded_to(size))
 
 
-    def __getitem__(self, index):
+    def __contains__(self, index):
         return bool(self._sequence & (1 << (index % self.size)))
 
 
@@ -145,7 +145,7 @@ class _Range:
         distance = value - start if stop > start else start - value
         if not 0 <= distance < abs(start - stop):
             return False
-        return self._pattern[distance]
+        return distance in self._pattern
 
 
     def __iter__(self):
