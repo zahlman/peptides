@@ -1,4 +1,5 @@
 from functools import lru_cache as _cache, total_ordering as _cmp
+from math import inf
 
 
 _range = range
@@ -107,39 +108,12 @@ class _Pattern:
         return bool(self._sequence & (1 << (index % self.size)))
 
 
-@_cmp
-class _Inf:
-    def __new__(cls, sign):
-        if not isinstance(sign, bool):
-            raise TypeError
-        if not hasattr(cls, '_instances'):
-            cls._instances = [
-                super().__new__(cls), super().__new__(cls)
-            ]
-        return cls._instances[sign]
-
-
-    def __init__(self, sign):
-        self._sign = sign
-
-
-    def __neg__(self):
-        return _Inf(not self._sign)
-
-
-    def __gt__(self, other):
-        if not isinstance(other, (_Inf, int)):
-            return NotImplemented
-        return False if self is other else self._sign
-
-
-    def __str__(self):
-        sign = '' if self._sign else '-'
-        return f'{sign}Inf'
-    __repr__ = __str__
-
-
-Inf = _Inf(True)
+def int_or_inf(x):
+    if isinstance(x, int):
+        return True
+    if isinstance(x, float) and x in (inf, -inf):
+        return True
+    return False
 
 
 class _Range:
@@ -153,14 +127,10 @@ class _Range:
     def __init__(self, start, stop, pattern):
         # Preprocessing ensures the range is directed from `start` to `stop`,
         # and that `start` is a definite endpoint except in the Z special case.
-        self._start, self._stop, self._pattern = start, stop, pattern
         assert isinstance(start, int)
-        assert isinstance(stop, (_Inf, int))
+        assert int_or_inf(stop)
         assert isinstance(pattern, _Pattern)
-        if stop in (Inf, -Inf):
-            self._size = Inf
-        else:
-            self._size = abs(start - stop)
+        self._start, self._stop, self._pattern = start, stop, pattern
 
 
     def __contains__(self, value):
@@ -173,7 +143,7 @@ class _Range:
         # Otherwise, find the corresponding index.
         start, stop = self._start, self._stop
         distance = value - start if stop > start else start - value
-        if not 0 <= distance < self._size:
+        if not 0 <= distance < abs(start - stop):
             return False
         return self._pattern[distance]
 
@@ -229,6 +199,6 @@ def range(*args):
         raise TypeError('start must be an integer')
     pattern, offset = _Pattern.create(step)
     start += (offset if stop > start else -offset)
-    if not isinstance(stop, (int, _Inf)):
-        raise TypeError('stop must be an integer or +/-Inf')
+    if not int_or_inf(stop):
+        raise TypeError('stop must be an integer or floating-point infinity')
     return _Range(start, stop, pattern)
