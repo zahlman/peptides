@@ -158,7 +158,15 @@ class _Range:
 
     def __str__(self):
         start, stop, p = self._start, self._stop, self._pattern
-        return 'range()' if start == stop else f"range({start}, {stop}, '{p}')"
+        if start == stop:
+            return 'range()'
+        if len(p.steps) > 1:
+            return f"range({start}, {stop}, '{p}')"
+        size = p.steps[0]
+        if size > 1:
+            step = size if stop > start else -size
+            return f'range({start}, {stop}, {step})'
+        return f'range({stop})' if start == 0 else f'range({start}, {stop})'
     __repr__ = __str__
 
 
