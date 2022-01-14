@@ -106,7 +106,7 @@ class _Pattern:
 
 
     def __contains__(self, index):
-        return bool(self._sequence & (1 << (index % self.size)))
+        return bool(self._sequence & (1 << ((index - 1) % self.size)))
 
 
     def __getitem__(self, index):
@@ -140,6 +140,14 @@ class _Range:
         self._start, self._stop, self._pattern = start, stop, pattern
 
 
+    def _signed(self, value):
+        return -value if self._start > self._stop else value
+
+
+    def _in_bounds(self, value):
+        return 0 <= value <= abs(self._start - self._stop)
+
+
     def __contains__(self, value):
         try:
             as_int = int(value)
@@ -149,8 +157,8 @@ class _Range:
             return False
         # Otherwise, find the corresponding index.
         start, stop = self._start, self._stop
-        distance = value - start if stop > start else start - value
-        if not 0 <= distance < abs(start - stop):
+        distance = self._signed(value - start)
+        if not self._in_bounds(distance):
             return False
         return distance in self._pattern
 
@@ -160,15 +168,18 @@ class _Range:
             raise NotImplementedError # TODO
         distance = self._pattern[as_index(item)]
         start, stop = self._start, self._stop
-        return (start + distance) if stop > start else (start - distance)
+        if not self._in_bounds(distance):
+            raise IndexError('range object index out of range')
+        return start + self._signed(distance)
 
 
     def __iter__(self):
         start, stop = self._start, self._stop
+        limit = abs(start - stop)
         for i in self._pattern:
-            if i >= abs(start - stop):
+            if i >= limit:
                 return
-            yield start + i if stop > start else start - i
+            yield start + self._signed(i)
 
 
     def __str__(self):
@@ -179,8 +190,7 @@ class _Range:
             return f"range({start}, {stop}, '{p}')"
         size = p.size
         if size > 1:
-            step = size if stop > start else -size
-            return f'range({start}, {stop}, {step})'
+            return f'range({start}, {stop}, {self._signed(size)})'
         return f'range({stop})' if start == 0 else f'range({start}, {stop})'
     __repr__ = __str__
 
