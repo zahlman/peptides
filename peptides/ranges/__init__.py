@@ -16,43 +16,58 @@ def _lcm(x, y):
 
 
 class _Pattern:
-    def __init__(self, count, sequence):
-        self._count = count
+    def __init__(self, sequence):
+        # `sequence` - an integer representing a repeating pattern of
+        # sequence.bit_length() values - via its binary representation, from
+        # least to most significant bit. It always ends in a true value; we
+        # rotate the sequence in preprocessing such that the first set bit in
+        # the input is moved to the end (ensuring that `bit_length` accurately
+        # tells us the desired length).
         self._sequence = sequence
 
 
     @staticmethod
     def create(step):
+        # return an instance and an offset.
         if isinstance(step, int):
             if step == 0:
                 raise ValueError('step cannot be zero')
-            return _Pattern(abs(step), 1)
+            return _Pattern(1 << (abs(step) - 1)), 0
         elif isinstance(step, str):
             # Avoid 0b prefixes.
             if any(c not in '01' for c in step):
                 raise ValueError('invalid pattern string')
-            return _Pattern(len(step), int(step[::-1], 2))
+            # Normalize by swapping the first 1 to the end.
+            count = step.find('1') + 1
+            if not count:
+                raise ValueError('pattern cannot be empty')
+            step = step[count:] + step[:count]
+            return _Pattern(int(step[::-1], 2)), count - 1
         else:
             raise TypeError('pattern must be int or string')
 
 
     @property
+    def size(self):
+        return self._sequence.bit_length()
+
+
+    @property
     @_cache(None)
     def steps(self):
-        result, bits, stride = [], self._sequence, 0 
-        for i in _range(self._count):
+        result, bits, stride = [], self._sequence, 1
+        while bits:
             if bits & 1:
                 result.append(stride)
                 stride = 0
             stride += 1
             bits >>= 1
-        result.append(stride + result[0])
-        start, *cycle = result
-        return start, cycle
+        return result
 
 
     def __iter__(self):
-        value, cycle = self.steps
+        # The 0th value is always in the cycle, due to the normalization.
+        value, cycle = 0, self.steps
         while True:
             for step in cycle:
                 yield value
@@ -64,27 +79,32 @@ class _Pattern:
 
 
     def __str__(self):
-        bits = bin(self._sequence)[2:]
-        return ((self._count - len(bits)) * '0' + bits)[::-1]
+        # The most significant bit stays at the front, because the 0th value
+        # is always present in the sequence. The rest are reversed, indicating
+        # what happens for the 1st value in the 1s place, etc.
+        bits = bin(self._sequence)
+        return bits[2] + bits[3:][::-1]
 
 
     def _padded_to(self, size):
-        assert size % self._count == 0
+        assert size % self._sequence.bit_length() == 0
         return sum(
             self._sequence << i
-            for i in range(0, size, self._count)
+            for i in range(0, size, self._sequence.bit_length())
         )
 
 
     def __and__(self, other):
         if not isinstance(other, _Pattern):
             return NotImplemented
-        size = _lcm(self._count, other._count)
-        return _Pattern(size, self._padded_to(size) & other._padded_to(size))
+        size = _lcm(self.size, other.size)
+        # Since the high bit is set in both inputs, it will be set
+        # in both padded versions, and thus in the output sequence.
+        return _Pattern(self._padded_to(size) & other._padded_to(size))
 
 
     def __getitem__(self, index):
-        return bool(self._sequence & (1 << (index % self._count)))
+        return bool(self._sequence & (1 << (index % self.size)))
 
 
 @_cmp
@@ -189,7 +209,13 @@ def range(*args):
     Empty ranges also display specially.
     `step` can instead be a string pattern of ones and zeroes, indicating the
     (repeating) sequence of which values are in the range. In this case,
-    the "direction" is inferred from `start` and `stop`."""
+    the "direction" is inferred from `start` and `stop`.
+
+    Normalization:
+    * The `start` value is normalized when using a string pattern that
+      doesn't start with a one.
+    * The `stop` value, when finite, is normalized to one plus the last
+      value in range (equal to `stop` for empty ranges)."""
     # Unpack the args per built-in `range`.
     count = len(args)
     if count > 3:
@@ -205,14 +231,17 @@ def range(*args):
         # Check for empty ranges and normalize.
         if (step < 0 and start < stop) or (step > 0 and start > stop):
             stop = start
-        # TODO: normalize `stop` for other cases?
+        # TODO: normalize `stop` for other cases
     if not isinstance(start, (int, _Inf)):
         raise TypeError('start must be an integer or -Inf')
+    pattern, offset = _Pattern.create(step)
     if start is Inf:
         raise ValueError('start cannot be +Inf')
+    elif start is not -Inf:
+        start += (offset if stop > start else -offset)
     if not isinstance(stop, (int, _Inf)):
         raise TypeError('stop must be an integer or +/-Inf')
-    return _Range(start, stop, _Pattern.create(step))
+    return _Range(start, stop, pattern)
 
 
 Z = range(-Inf, Inf, 1)
