@@ -88,10 +88,10 @@ class _Pattern:
 
 
     def _padded_to(self, size):
-        assert size % self._sequence.bit_length() == 0
+        assert size % self.size == 0
         return sum(
             self._sequence << i
-            for i in range(0, size, self._sequence.bit_length())
+            for i in range(0, size, self.size)
         )
 
 
