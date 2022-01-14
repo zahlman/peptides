@@ -1,5 +1,6 @@
 from functools import lru_cache as _cache, total_ordering as _cmp
 from math import inf
+from operator import index as as_index
 
 
 _range = range
@@ -108,6 +109,12 @@ class _Pattern:
         return bool(self._sequence & (1 << (index % self.size)))
 
 
+    def __getitem__(self, index):
+        index = as_index(index) # slices not supported (yet)
+        step_q, step_r = divmod(index, len(self.steps))
+        return step_q * self.size + self.steps[step_r]
+
+
 def int_or_inf(x):
     if isinstance(x, int):
         return True
@@ -146,6 +153,14 @@ class _Range:
         if not 0 <= distance < abs(start - stop):
             return False
         return distance in self._pattern
+
+
+    def __getitem__(self, item):
+        if isinstance(item, slice):
+            raise NotImplementedError # TODO
+        distance = self._pattern[as_index(item)]
+        start, stop = self._start, self._stop
+        return (start + distance) if stop > start else (start - distance)
 
 
     def __iter__(self):
