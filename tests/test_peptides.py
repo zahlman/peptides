@@ -12,6 +12,7 @@ def test_version():
     assert __version__ == '0.1.0'
 
 
+@parametrize('method', (list, len))
 @parametrize('start,stop,step', [
     (1, 10, 1),
     (2, 17, 3),
@@ -21,8 +22,8 @@ def test_version():
     (3, -10, -1),
     (3, -10, -2)
 ])
-def test_simple_equivalents(start, stop, step):
-    assert list(range(start, stop, step)) == list(prange(start, stop, step))
+def test_simple_equivalents(start, stop, step, method):
+    assert method(range(start, stop, step)) == method(prange(start, stop, step))
 
 
 @parametrize('args', [
@@ -109,3 +110,14 @@ def test_empties(args):
 ])
 def test_equivalent(args):
     assert list(prange(*args)) == list(range(10))
+
+
+@parametrize('args', [
+    (inf,),
+    (0, inf),
+    (34, -inf, -7),
+    (-23, -inf, '1101')
+])
+def test_inf_len(args):
+    with raises(ValueError):
+        len(prange(*args))
