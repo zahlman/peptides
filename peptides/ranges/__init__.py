@@ -72,7 +72,7 @@ class _Pattern:
         size = self.size
         while True:
             for step in cycle:
-                yield value
+                yield value + step 
             value += size
 
 
