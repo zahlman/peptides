@@ -115,6 +115,12 @@ class _Pattern:
         return step_q * self.size + self.steps[step_r]
 
 
+    def count(self, distance):
+        q, r = divmod(distance, self.size)
+        steps = self.steps
+        return q * len(steps) + len([x for x in steps if x < r])
+
+
 def int_or_inf(x):
     if isinstance(x, int):
         return True
@@ -146,6 +152,13 @@ class _Range:
 
     def _in_bounds(self, value):
         return 0 <= value <= abs(self._start - self._stop)
+
+
+    def __len__(self):
+        start, stop = self._start, self._stop
+        if isinstance(stop, float):
+            raise ValueError('len() of unbounded range')
+        return self._pattern.count(self._signed(stop - start))
 
 
     def __contains__(self, value):
