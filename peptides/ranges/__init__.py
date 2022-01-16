@@ -1,124 +1,66 @@
 from functools import lru_cache as _cache, total_ordering as _cmp
+from itertools import count
 from math import inf
 from operator import index as as_index
 
 
-_range = range
-
-
-def _gcd(x, y):
-    x, y = max(x, y), min(x, y)
-    while y != 0:
-        x, y = y, x % y
-    return x
-
-
-def _lcm(x, y):
-    return (x * y) // _gcd(x, y)
-
-
 class _Pattern:
-    def __init__(self, sequence):
-        # `sequence` - an integer representing a repeating pattern of
-        # sequence.bit_length() values - via its binary representation, from
-        # least to most significant bit. It always ends in a true value; we
-        # rotate the sequence in preprocessing such that the first set bit in
-        # the input is moved to the end (ensuring that `bit_length` accurately
-        # tells us the desired length).
-        self._sequence = sequence
+    def __init__(self, steps):
+        # The values are either positive and in ascending order, or negative
+        # and in descending order. The last value indicates the size of the
+        # repeating pattern.
+        self._steps = steps
 
 
-    @staticmethod
-    def create(step):
-        # return an instance and an offset.
-        if isinstance(step, int):
-            if step == 0:
-                raise ValueError('step cannot be zero')
-            return _Pattern(1 << (abs(step) - 1)), 0
-        elif isinstance(step, str):
-            # Avoid 0b prefixes.
-            if any(c not in '01' for c in step):
-                raise ValueError('invalid pattern string')
-            # Normalize by swapping the first 1 to the end.
-            count = step.find('1') + 1
-            if not count:
-                raise ValueError('pattern cannot be empty')
-            step = step[count:] + step[:count]
-            return _Pattern(int(step[::-1], 2)), count - 1
-        else:
-            raise TypeError('pattern must be int or string')
+    def __iter__(self):
+        yield 0 # will be missed the first time around
+        for offset in count(step = self._steps[-1]):
+            for step in self._steps:
+                yield offset + step 
 
 
     @property
     def size(self):
-        return self._sequence.bit_length()
+        return self._steps[-1]
 
 
-    @property
-    @_cache(None)
-    def steps(self):
-        result, bits, position = [0], self._sequence, 1
-        while bits != 1: # skip the sentinel.
-            if bits & 1:
-                result.append(position)
-            position += 1
-            bits >>= 1
-        return result
-
-
-    def __iter__(self):
-        # The 0th value is always in the cycle, due to the normalization.
-        value, cycle = 0, self.steps
-        size = self.size
-        while True:
-            for step in cycle:
-                yield value + step 
-            value += size
+    def _index(self, value):
+        # helper search method
+        assert abs(value) < abs(self.size)
+        # handle candidate == 0 specially because of how self.steps is built
+        if value == 0:
+            return 0, True
+        # since 0 <= abs(value) < abs(self.size),
+        # the last check will always succeed, returning (self.size, False)
+        for i, candidate in enumerate(self._steps, 1):
+            if abs(candidate) >= abs(value):
+                return i, candidate == value
 
 
     def __repr__(self):
-        return f'{self.__class__.__qualname__}.create({str(self)!r})'
+        return f'{self.__class__.__qualname__}({self})'
 
 
     def __str__(self):
-        # The most significant bit stays at the front, because the 0th value
-        # is always present in the sequence. The rest are reversed, indicating
-        # what happens for the 1st value in the 1s place, etc.
-        bits = bin(self._sequence)
-        return bits[2] + bits[3:][::-1]
-
-
-    def _padded_to(self, size):
-        assert size % self.size == 0
-        return sum(
-            self._sequence << i
-            for i in range(0, size, self.size)
-        )
-
-
-    def __and__(self, other):
-        if not isinstance(other, _Pattern):
-            return NotImplemented
-        size = _lcm(self.size, other.size)
-        # Since the high bit is set in both inputs, it will be set
-        # in both padded versions, and thus in the output sequence.
-        return _Pattern(self._padded_to(size) & other._padded_to(size))
+        return ', '.join(map(str, self._steps))
 
 
     def __contains__(self, index):
-        return bool(self._sequence & (1 << ((index - 1) % self.size)))
+        before, found = self._index(index % self.size)
+        return found
 
 
     def __getitem__(self, index):
         index = as_index(index) # slices not supported (yet)
-        step_q, step_r = divmod(index, len(self.steps))
+        step_q, step_r = divmod(index - 1, len(self._steps))
         return step_q * self.size + self.steps[step_r]
 
 
     def count(self, distance):
+        # How many elements in [0, distance)?
         q, r = divmod(distance, self.size)
-        steps = self.steps
-        return q * len(steps) + len([x for x in steps if x < r])
+        before, found = self._index(r)
+        return q * len(self._steps) + before
 
 
 def int_or_inf(x):
@@ -158,7 +100,7 @@ class _Range:
         start, stop = self._start, self._stop
         if isinstance(stop, float):
             raise ValueError('len() of unbounded range')
-        return self._pattern.count(self._signed(stop - start))
+        return self._pattern.count(stop - start)
 
 
     def __contains__(self, value):
@@ -190,20 +132,17 @@ class _Range:
         start, stop = self._start, self._stop
         limit = abs(start - stop)
         for i in self._pattern:
-            if i >= limit:
+            if abs(i) >= limit:
                 return
-            yield start + self._signed(i)
+            yield start + i
 
 
     def __str__(self):
-        start, stop, p = self._start, self._stop, self._pattern
+        start, stop, p = self._start, self._stop, str(self._pattern)
         if start == stop:
             return 'range()'
-        if len(p.steps) > 1:
-            return f"range({start}, {stop}, '{p}')"
-        size = p.size
-        if size > 1:
-            return f'range({start}, {stop}, {self._signed(size)})'
+        if p != '1':
+            return f"range({start}, {stop}, {p})"
         return f'range({stop})' if start == 0 else f'range({start}, {stop})'
     __repr__ = __str__
 
@@ -211,14 +150,13 @@ class _Range:
 def range(*args):
     """range() -> (empty) range object
     range(stop) -> range object
-    range(start, stop[, step]) -> range object
+    range(start, stop, *steps) -> range object
 
     More-or-less-drop-in replacement for built-in `range`.
     Can also be called with zero arguments to produce an empty range.
     Empty ranges also display specially.
-    `step` can instead be a string pattern of ones and zeroes, indicating the
-    (repeating) sequence of which values are in the range. In this case,
-    the "direction" is inferred from `start` and `stop`.
+    `steps` can be an ascending sequence of positive integers, or a
+    descending sequence of negative integers. Defaults to (1,).
 
     Normalization:
     * The `start` value is normalized when using a string pattern that
@@ -227,24 +165,31 @@ def range(*args):
       value in range (equal to `stop` for empty ranges)."""
     # Unpack the args per built-in `range`.
     count = len(args)
-    if count > 3:
-        raise TypeError('too many arguments for range() (at most 3 permitted)')
-    start, stop, step = [
-        (0, 0, 1),
-        (0, *args, 1),
-        (*args, 1),
-        args
-    ][len(args)]
+    if count > 2:
+        start, stop, *steps = args
+    else:
+        start, stop, steps = 0, 0, (1,)
+        if count == 2:
+            start, stop = args
+        elif count == 1:
+            stop, = args
     # Do a whole bunch of sanity checks.
-    if isinstance(step, int):
-        # Check for empty ranges and normalize.
-        if (step < 0 and start < stop) or (step > 0 and start > stop):
-            stop = start
-        # TODO: normalize `stop` for other cases
     if not isinstance(start, int):
         raise TypeError('start must be an integer')
-    pattern, offset = _Pattern.create(step)
-    start += (offset if stop > start else -offset)
     if not int_or_inf(stop):
         raise TypeError('stop must be an integer or floating-point infinity')
-    return _Range(start, stop, pattern)
+    if not all(isinstance(step, int) for step in steps):
+        raise TypeError('steps must all be integer')
+    if 0 in steps:
+        raise ValueError('steps may not be zero')
+    step_direction = -1 if steps[0] < 0 else 1
+    if not all(
+        ((y - x) * step_direction) > 0
+        for x, y in zip(steps, steps[1:])
+    ):
+        raise ValueError('invalid step sequence')
+    # Normalize empty intervals. TODO: normalize other intervals too.
+    range_direction = -1 if stop < start else 1
+    if step_direction != range_direction:
+        stop = start
+    return _Range(start, stop, _Pattern(steps))
