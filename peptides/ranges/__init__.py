@@ -163,6 +163,33 @@ class _Range:
     __repr__ = __str__
 
 
+    # TODO: test these
+
+
+    def __add__(self, scalar):
+        return _Range(self.start + scalar, self.stop + scalar, self.steps)
+
+
+    def __sub__(self, scalar):
+        return self + (-scalar)
+
+
+    def __mul__(self, scalar):
+        return _Range(
+            self.start * scalar, self.stop * scalar,
+            (x*scalar for x in self.steps)
+        )
+
+
+    def __neg__(self): # unary -: reverse sign and orientation
+        return self * -1
+
+
+    #def __invert__(self): # unary ~: same range, all other steps
+    # TODO
+
+
+
 def range(*args):
     """range() -> (empty) range object
     range(stop) -> range object
