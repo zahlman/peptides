@@ -89,8 +89,7 @@ class _Range:
         # and that `start` is a definite endpoint except in the Z special case.
         assert isinstance(start, int)
         assert int_or_inf(stop)
-        assert isinstance(pattern, _Pattern)
-        self._start, self._stop, self._pattern = start, stop, pattern
+        self._start, self._stop, self._pattern = start, stop, _Pattern(pattern)
 
 
     @property
@@ -209,4 +208,4 @@ def range(*args):
     range_direction = -1 if stop < start else 1
     if step_direction != range_direction:
         stop = start
-    return _Range(start, stop, _Pattern(steps))
+    return _Range(start, stop, steps)
