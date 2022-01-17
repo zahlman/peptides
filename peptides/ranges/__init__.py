@@ -9,14 +9,19 @@ class _Pattern:
         # The values are either positive and in ascending order, or negative
         # and in descending order. The last value indicates the size of the
         # repeating pattern.
-        self._steps = steps
+        self._steps = tuple(steps)
 
 
     def __iter__(self):
         yield 0 # will be missed the first time around
         for offset in count(step = self._steps[-1]):
             for step in self._steps:
-                yield offset + step 
+                yield offset + step
+
+
+    @property
+    def steps(self):
+        return self._steps
 
 
     @property
@@ -88,19 +93,33 @@ class _Range:
         self._start, self._stop, self._pattern = start, stop, pattern
 
 
+    @property
+    def start(self):
+        return self._start
+
+
+    @property
+    def stop(self):
+        return self._stop
+
+
+    @property
+    def steps(self):
+        return self._pattern.steps
+
+
     def _signed(self, value):
-        return -value if self._start > self._stop else value
+        return -value if self.start > self.stop else value
 
 
     def _in_bounds(self, value):
-        return 0 <= value <= abs(self._start - self._stop)
+        return 0 <= value <= abs(self.start - self.stop)
 
 
     def __len__(self):
-        start, stop = self._start, self._stop
-        if isinstance(stop, float):
+        if isinstance(self.stop, float):
             raise ValueError('len() of unbounded range')
-        return self._pattern.count(stop - start)
+        return self._pattern.count(self.stop - self.start)
 
 
     def __contains__(self, value):
@@ -111,8 +130,7 @@ class _Range:
         if as_int != value: # e.g. non-integer float
             return False
         # Otherwise, find the corresponding index.
-        start, stop = self._start, self._stop
-        distance = self._signed(value - start)
+        distance = self._signed(value - self.start)
         if not self._in_bounds(distance):
             return False
         return distance in self._pattern
@@ -122,27 +140,26 @@ class _Range:
         if isinstance(item, slice):
             raise NotImplementedError # TODO
         distance = self._pattern[as_index(item)]
-        start, stop = self._start, self._stop
         if not self._in_bounds(distance):
             raise IndexError('range object index out of range')
-        return start + self._signed(distance)
+        return self.start + self._signed(distance)
 
 
     def __iter__(self):
-        start, stop = self._start, self._stop
-        limit = abs(start - stop)
+        limit = abs(self.start - self.stop)
         for i in self._pattern:
             if abs(i) >= limit:
                 return
-            yield start + i
+            yield self.start + i
 
 
     def __str__(self):
-        start, stop, p = self._start, self._stop, str(self._pattern)
+        start, stop, steps = self.start, self.stop, self.steps
         if start == stop:
             return 'range()'
-        if p != '1':
-            return f"range({start}, {stop}, {p})"
+        if steps != (1,):
+            args = (start, stop) + steps
+            return f'range{args}'
         return f'range({stop})' if start == 0 else f'range({start}, {stop})'
     __repr__ = __str__
 
