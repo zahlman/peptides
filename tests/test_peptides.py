@@ -132,3 +132,10 @@ def test_equivalent(args):
 def test_inf_len(args):
     with raises(ValueError):
         len(prange(*args))
+
+
+def test_operators():
+    # These are pretty straightforward.
+    p = prange(1, 10, 3)
+    assert (p + 5) - 5 == p
+    assert -p * -1 == p

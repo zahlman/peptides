@@ -5,6 +5,7 @@ from operator import index as as_index
 
 
 class _Pattern:
+    # An immutable object representing a periodic sequence of integers.
     def __init__(self, steps):
         # The values are either positive and in ascending order, or negative
         # and in descending order. The last value indicates the size of the
@@ -61,6 +62,10 @@ class _Pattern:
         return step_q * self.size + self.steps[step_r]
 
 
+    def __mul__(self, scalar):
+        return _Pattern(s * scalar for s in self._steps)
+
+
     def count(self, distance):
         # How many elements in [0, distance)?
         q, r = divmod(distance, self.size)
@@ -80,16 +85,10 @@ class _Range:
     """Replacement for builtin `range` that can represent unbounded ranges
     and sequences with fancier patterns."""
     # Not intended to be called directly.
-    # Negative value for `pattern` indicates counting downward.
-    # The high bit of the absolute value is ignored; the rest encode a
-    # repeating pattern used to mask values starting at `start` and proceeding
-    # to `stop`.
     def __init__(self, start, stop, pattern):
-        # Preprocessing ensures the range is directed from `start` to `stop`,
-        # and that `start` is a definite endpoint except in the Z special case.
         assert isinstance(start, int)
         assert int_or_inf(stop)
-        self._start, self._stop, self._pattern = start, stop, _Pattern(pattern)
+        self._start, self._stop, self._pattern = start, stop, pattern
 
 
     @property
@@ -164,10 +163,12 @@ class _Range:
 
 
     # TODO: test these
+    def __eq__(self, other):
+        return self.start == other.start and self.stop == other.stop and self.steps == other.steps
 
 
     def __add__(self, scalar):
-        return _Range(self.start + scalar, self.stop + scalar, self.steps)
+        return _Range(self.start + scalar, self.stop + scalar, self._pattern)
 
 
     def __sub__(self, scalar):
@@ -176,8 +177,7 @@ class _Range:
 
     def __mul__(self, scalar):
         return _Range(
-            self.start * scalar, self.stop * scalar,
-            (x*scalar for x in self.steps)
+            self.start * scalar, self.stop * scalar, self._pattern * scalar
         )
 
 
@@ -235,4 +235,4 @@ def range(*args):
     range_direction = -1 if stop < start else 1
     if step_direction != range_direction:
         stop = start
-    return _Range(start, stop, steps)
+    return _Range(start, stop, _Pattern(steps))
