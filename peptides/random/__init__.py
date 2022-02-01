@@ -20,6 +20,10 @@ class Generator(ABC):
         return self.bits(count * 8).to_bytes(count, byteorder=byteorder)
 
 
+    def boolean(self):
+        return bool(self.bits(1))
+
+
     def decimal(self):
         """Return a random floating-point value in [0.0, 1.0).
         All possible floats are used, but the PDF is uniform."""
@@ -187,6 +191,10 @@ def bits(amount):
 
 def data(amount, byteorder=sys.byteorder):
     return Random._implementation.data(amount, byteorder)
+
+
+def boolean():
+    return Random._implementation.boolean()
 
 
 def decimal():
