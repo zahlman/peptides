@@ -185,59 +185,8 @@ class revert_state:
         self._instance.state = self._state
 
 
-def bits(amount):
-    return Random._implementation.bits(amount)
-
-
-def data(amount, byteorder=sys.byteorder):
-    return Random._implementation.data(amount, byteorder)
-
-
-def boolean():
-    return Random._implementation.boolean()
-
-
-def decimal():
-    return Random._implementation.decimal()
-
-
-def between(start, end):
-    return Random._implementation.between(start, end)
-
-
-def choose(
-    iterable, count=1, *,
-    replace=None, base_weight=1, weights=(), cumulative=False
+for name in (
+    'bits', 'data', 'boolean', 'decimal', 'between',
+    'choose', 'sample', 'values', 'shuffle', 'shuffled'
 ):
-    return Random._implementation.choose(
-        iterable, count, replace=replace,
-        base_weight=base_weight, weights=weights, cumulative=cumulative
-    )
-
-
-def sample(
-    iterable, count=1, *,
-    base_weight=1, weights=(), cumulative=False
-):
-    return Random._implementation.sample(
-        iterable, count,
-        base_weight=base_weight, weights=weights, cumulative=cumulative
-    )
-
-
-def values(
-    iterable, count=1, *,
-    base_weight=1, weights=(), cumulative=False
-):
-    return Random._implementation.values(
-        iterable, count,
-        base_weight=base_weight, weights=weights, cumulative=cumulative
-    )
-
-
-def shuffle(a_list):
-    return Random._implementation.shuffle(a_list)
-
-
-def shuffled(iterable):
-    return Random._implementation.shuffled(iterable)
+    globals()[name] = getattr(Random._implementation, name)
