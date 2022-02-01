@@ -1,7 +1,24 @@
+from abc import ABC, abstractmethod
+import sys
+
+
 """Replacement for standard library `random`, with an improved interface."""
 
 
-class Random:
+class Generator(ABC):
+    @abstractmethod
+    def bits(self, count):
+        """Return a positive integer with the specified number of bits."""
+        pass
+
+
+    def data(self, count, byteorder=sys.byteorder):
+        """Return the specified number of random bytes."""
+        # It doesn't really matter which byte order we use for this.
+        return self.bits(count * 8).to_bytes(count, byteorder=byteorder)
+
+
+class Random(Generator):
     # Import within the class to hide the names at top level
     from random import Random as _seeded
     try:
@@ -75,3 +92,7 @@ class revert_state:
 
 def bits(amount):
     return Random._implementation.bits(amount)
+
+
+def data(amount, byteorder=sys.byteorder):
+    return Random._implementation.data(amount, byteorder)
