@@ -8,12 +8,21 @@ import sys
 
 
 class Generator(ABC):
+    """Abstract base class for random number generators."""
     @abstractmethod
     def bits(self, count):
         """Return a positive integer with the specified number of bits."""
         pass
 
 
+    @abstractmethod
+    def decimal(self):
+        """Return a random floating-point value in [0.0, 1.0).
+        All possible floats are used, but the PDF is uniform."""
+        pass
+
+
+    # Mixin methods.
     def data(self, count, byteorder=sys.byteorder):
         """Return the specified number of random bytes."""
         # It doesn't really matter which byte order we use for this.
@@ -22,19 +31,6 @@ class Generator(ABC):
 
     def boolean(self):
         return bool(self.bits(1))
-
-
-    def decimal(self):
-        """Return a random floating-point value in [0.0, 1.0).
-        All possible floats are used, but the PDF is uniform."""
-        # Adaptedrom the documentation.
-        mantissa = 0x10_0000_0000_0000 | self.bits(52)
-        exponent = -53
-        x = 0
-        while not x:
-            x = self.bits(32)
-            exponent += x.bit_length() - 32
-        return ldexp(mantissa, exponent)
 
 
     def between(self, start, end):
@@ -113,80 +109,119 @@ class Generator(ABC):
         return result
 
 
-class Random(Generator):
-    # Import within the class to hide the names at top level
-    from random import Random as _seeded
-    try:
-        from random import SystemRandom as _system
-    except ImportError:
-        _system = lambda: _seeded(None)
-    
+class BitsGenerator(Generator):
+    """An implementation of Generator based on generating raw bits.
+    A function is supplied to implement the `.bits` method, and `.decimal`
+    is implemented in terms of that."""
+    def __init__(self, get_bits):
+        self._get_bits = get_bits
 
-    def __init__(self, *args):
-        if not args:
-            self._implementation = Random._system()
-            return
-        seed, *args = args
-        if args:
-            count = len(args) + 1
-            raise TypeError(f'Random expected at most 1 argument, got {count}')
-        self._implementation = Random._seeded(seed)
+
+    def bits(self, count):
+        # Accomodate functions that arbitrarily don't support count==0.
+        return 0 if count == 0 else self._get_bits(count)
+
+
+    def decimal(self):
+        # Adapted from the documentation.
+        mantissa = 0x10_0000_0000_0000 | self.bits(52)
+        exponent = -53
+        x = 0
+        while not x:
+            x = self.bits(32)
+            exponent += x.bit_length() - 32
+        return ldexp(mantissa, exponent)
+
+
+class RealGenerator(Generator):
+    """An implementation of Generator based on generating floating-point values.
+    A function is supplied that returns a float value, which is normalized to
+    implement `.decimal`. `bits` is implemented in terms of that, getting up
+    to 53 bits per `decimal` call."""
+    def __init__(self, get_float):
+        self._get_float = get_float
+
+
+    def bits(self, count):
+        q, r = divmod(count, 53)
+        if r:
+            q, r = q + 1, 53 - r
+        result = 0
+        for _ in range(q):
+            next_bits = self.decimal() * (1 << 53)
+            result = (result << 53) | next_bits
+        return result >> r
+
+
+    def decimal(self):
+        # No, we don't want `fmod` here; the result should be in [0, 1).
+        # We expect values to be uniformly distributed whether or not
+        # mantissas are, so use arithmetic to convert.
+        return self._get_float() % 1
+
+
+class Seeded(BitsGenerator):
+    """A generator that uses a seed value to initialize a MT19937
+    implementation and uses that as an entropy source. It also exposes
+    the state of that internal generator as a property, and provides
+    a context manager to revert the state after some operations."""
+    # Import within the class to hide the names at top level
+    from random import Random as _implementation
+    def __init__(self, seed):
+        self._implementation = Seeded._implementation(seed)
+        super().__init__(self, self._implementation.getrandbits)
 
 
     @property
     def state(self):
-        try:
-            return self._implementation.getstate()
-        except NotImplementedError:
-            return None
+        return self._implementation.getstate()
 
 
     @state.setter
     def state(self, value):
-        try:
-            self._implementation.setstate(value)
-        except NotImplementedError:
-            if value is not None:
-                raise ValueError("State must be None for generator using system entropy source")
+        self._implementation.setstate(value)
 
 
-    def bits(self, amount):
-        # For compatibility <3.9.
-        if isinstance(amount, int) and amount == 0:
-            return 0
-        try:
-            return self._implementation.getrandbits(amount)
-        except ValueError: # Fix the message.
-            raise ValueError("number of bits must be non-negative")
+    class _revert_state:
+        def __init__(self, instance):
+            self._instance = instance
 
 
-Random._implementation = Random()
+        def __enter__(self):
+            self._state = self._instance.state
+            return self._instance
 
 
-def get_state():
-    return Random._implementation.state
+        def __exit__(self, exc_type, exc_value, traceback):
+            self._instance.state = self._state
 
 
-def set_state(state):
-    Random._implementation.state = state
+    def revert_state(self): # context manager
+        return Seeded._revert_state(self)
 
 
-class revert_state:
-    def __init__(self, instance=Random._implementation):
-        self._instance = instance
-
-
-    def __enter__(self):
-        self._state = self._instance.state
-        return self._instance
-
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self._instance.state = self._state
+try:
+    class SystemRandom(BitsGenerator):
+        # Import within the class to hide the names at top level
+        from random import SystemRandom as _implementation
+        def __init__(self):
+            self._implementation = SystemRandom._implementation()
+            super().__init__(self._implementation.getrandbits)
+except ImportError:
+    # The name `SystemRandom` won't be available, and the core functions
+    # will be implemented by a default-seeded instance. Even though it has
+    # a state, we don't implement getstate()/setstate() - the user should
+    # create an instance explicitly in order to have reproducible streams.
+    Generator._default = Seeded(None)
+else:
+    # The core functions will be implemented by a SystemRandom instance,
+    # which draws entropy from a hardware source. There is no state to
+    # inspect or modify.
+    Generator._default = SystemRandom()
 
 
 for name in (
     'bits', 'data', 'boolean', 'decimal', 'between',
     'choose', 'sample', 'values', 'shuffle', 'shuffled'
 ):
-    globals()[name] = getattr(Random._implementation, name)
+    globals()[name] = getattr(Generator._default, name)
