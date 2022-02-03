@@ -4,12 +4,7 @@ from math import inf
 from pytest import raises, mark
 parametrize = mark.parametrize
 # local package
-from peptides import __version__
 from peptides.ranges import range as prange
-
-
-def test_version():
-    assert __version__ == '0.1.0'
 
 
 @parametrize('method', (list, len))
