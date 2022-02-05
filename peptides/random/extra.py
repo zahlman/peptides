@@ -28,22 +28,12 @@ class GeneratorMixin:
         return start + raw
 
 
-    def choose(
-        self, iterable, count=1, *,
-        replace=None, base_weight=1, weights=(), cumulative=False
-    ):
-        """Choose multiple values from the input.
+    def sample(self, iterable, count=1):
+        """Choose multiple values from the input, without replacement.
         `iterable` -> an iterable of values (not necessarily a sequence),
         or a mapping from values to (integer) counts. E.g. `{'x': 4, 'y': 2}`
         is equivalent to `['x', 'x', 'x', 'x', 'y', 'y']`.
         `count` -> the number of elements to choose.
-        `replace` -> whether to choose with replacement. Required if `count`>1.
-        weights -> a sequence of weights to use for the first however many
-        elements of the iterable. Must be empty when `iterable` is a mapping.
-        cumulative -> if set, the values in `weights` are treated as cumulative.
-        Has no effect when `iterable` is a mapping.
-        base_weight -> the relative weight of elements beyond len(weights).
-        Has no effect when `iterable` is a mapping.
 
         The values are returned in the order of appearance in the original
         `iterable`. This cannot be used to make a shuffled copy.
@@ -51,26 +41,25 @@ class GeneratorMixin:
         raise NotImplementedError # TODO
 
 
-    def sample(
-        self, iterable, count=1, *,
-        base_weight=1, weights=(), cumulative=False
-    ):
-        """Wrapper for `choose` without replacement."""
-        return self.choose(
-            iterable, count, replace=False,
-            base_weight=base_weight, weights=weights, cumulative=cumulative
-        )
-
-
     def values(
         self, iterable, count=1, *,
-        base_weight=1, weights=(), cumulative=False
+        weights=(), base_weight=1, cumulative=False
     ):
-        """Wrapper for `choose` with replacement."""
-        return self.choose(
-            iterable, count, replace=True,
-            base_weight=base_weight, weights=weights, cumulative=cumulative
-        )
+        """Choose multiple values from the input, with replacement.
+        `iterable` -> an iterable of values (not necessarily a sequence),
+        or a mapping from values to weights.
+        `count` -> the number of elements to choose.
+        `weights` -> a sequence of weights to use for the first however many
+        elements of the iterable. Must be empty when `iterable` is a mapping.
+        `base_weight` -> the relative weight of elements beyond len(weights).
+        Has no effect when `iterable` is a mapping.
+        `cumulative` -> if set, the values in `weights` are treated as
+        cumulative. Has no effect when `iterable` is a mapping.
+
+        The values are returned as a dict, indicating how many times each
+        element was chosen (only for those chosen at least once).
+        """
+        raise NotImplementedError # TODO
 
 
     def shuffle(self, a_list):
