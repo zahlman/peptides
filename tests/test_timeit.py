@@ -346,6 +346,10 @@ _main_out_cases = (
         "100 loops, best of 5: 3e+03 usec per loop\n", {}
     ),
     (
+        'time_nsec', [], 0.003, ['-u', 'nsec'],
+        "100 loops, best of 5: 3e+06 nsec per loop\n", {}
+    ),
+    (
         'time_parsec', [], 0.003, ['-u', 'parsec'],
         'Unrecognized unit. Please select nsec, usec, msec, or sec.\n',
         {'verify': 'err'}
