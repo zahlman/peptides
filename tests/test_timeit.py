@@ -1,5 +1,6 @@
 # standard library
 import io, sys
+from contextlib import contextmanager
 from textwrap import dedent
 # pytest
 from pytest import fixture, mark, param, raises
@@ -47,6 +48,11 @@ def fake_timer():
     del timeit._fake_timer
 
 
+@contextmanager
+def does_not_raise():
+    yield
+
+
 def test_reindent_empty():
     assert timeit.reindent("", 0) == ""
     assert timeit.reindent("", 4) == ""
@@ -70,50 +76,48 @@ def test_reindent_multi():
     )
 
 
-def test_timer_invalid_stmt():
-    with raises(ValueError):
-        timeit.Timer(stmt=None)
-    with raises(SyntaxError):
-        timeit.Timer(stmt='return')
-    with raises(SyntaxError):
-        timeit.Timer(stmt='yield')
-    with raises(SyntaxError):
-        timeit.Timer(stmt='yield from ()')
-    with raises(SyntaxError):
-        timeit.Timer(stmt='break')
-    with raises(SyntaxError):
-        timeit.Timer(stmt='continue')
-    with raises(SyntaxError):
-        timeit.Timer(stmt='from timeit import *')
-    with raises(SyntaxError):
-        timeit.Timer(stmt='  pass')
-    with raises(SyntaxError):
-        timeit.Timer(stmt='  break', setup='while False:\n  pass')
+_timer_args_cases = (
+    ('stmt_none', ValueError, {'stmt': None}),
+    ('stmt_return', SyntaxError, {'stmt': 'return'}),
+    ('stmt_yield', SyntaxError, {'stmt': 'yield'}),
+    ('stmt_yield_from', SyntaxError, {'stmt': 'yield from ()'}),
+    ('stmt_break', SyntaxError, {'stmt': 'break'}),
+    ('stmt_continue', SyntaxError, {'stmt': 'continue'}),
+    ('stmt_import', SyntaxError, {'stmt': 'from timeit import *'}),
+    ('stmt_misaligned', SyntaxError, {'stmt': '  pass'}),
+    (
+        'stmt_misaligned_setup', SyntaxError,
+        {'stmt': '  break', 'setup': 'while False:\n  pass'}
+    ),
+    ('stmt_empty', None, {'stmt': ''}),
+    ('stmt_whitespace', None, {'stmt': ' \n\t\f'}),
+    ('stmt_comment', None, {'stmt': '# comment'}),
+    ('setup_none', ValueError, {'setup': None}),
+    ('setup_return', SyntaxError, {'setup': 'return'}),
+    ('setup_yield', SyntaxError, {'setup': 'yield'}),
+    ('setup_yield_from', SyntaxError, {'setup': 'yield from ()'}),
+    ('setup_break', SyntaxError, {'setup': 'break'}),
+    ('setup_continue', SyntaxError, {'setup': 'continue'}),
+    ('setup_import', SyntaxError, {'setup': 'from timeit import *'}),
+    ('setup_misaligned', SyntaxError, {'setup': '  pass'})
+)
 
 
-def test_timer_invalid_setup():
-    with raises(ValueError):
-        timeit.Timer(setup=None)
-    with raises(SyntaxError):
-        timeit.Timer(setup='return')
-    with raises(SyntaxError):
-        timeit.Timer(setup='yield')
-    with raises(SyntaxError):
-        timeit.Timer(setup='yield from ()')
-    with raises(SyntaxError):
-        timeit.Timer(setup='break')
-    with raises(SyntaxError):
-        timeit.Timer(setup='continue')
-    with raises(SyntaxError):
-        timeit.Timer(setup='from timeit import *')
-    with raises(SyntaxError):
-        timeit.Timer(setup='  pass')
+def _timer_args_param(args):
+    name, err, kwargs = args
+    stmt, setup = kwargs.get('stmt', 'pass'), kwargs.get('setup', 'pass')
+    expectation = does_not_raise() if err is None else raises(err)
+    return param(stmt, setup, expectation, id=name)
 
 
-def test_timer_empty_stmt():
-    timeit.Timer(stmt='')
-    timeit.Timer(stmt=' \n\t\f')
-    timeit.Timer(stmt='# comment')
+def my_parametrize(names, arg_maker, cases):
+    return parametrize(names, tuple(map(arg_maker, cases)))
+
+
+@my_parametrize('stmt,setup,expectation', _timer_args_param, _timer_args_cases)
+def test_timer_args(stmt, setup, expectation):
+    with expectation:
+        timeit.Timer(stmt=stmt, setup=setup)
 
 
 fake_setup = "from peptides import timeit\ntimeit._fake_timer.setup()"
