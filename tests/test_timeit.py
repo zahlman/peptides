@@ -369,7 +369,7 @@ _main_out_cases = (
     _main_out_cases, 'seconds_per_call', 'switches', 'expected', verify=None
 )
 def test_main_out(
-    capsys, fake_timer, expected, seconds_per_call, switches, verify 
+    capsys, fake_timer, expected, seconds_per_call, switches, verify
 ):
     fake_timer.seconds_per_call = seconds_per_call
     out, err = run_main(capsys, fake_timer, switches=switches)
@@ -384,39 +384,47 @@ def test_main_out(
         assert not err
 
 
-def autorange(timer, callback=None):
-    t = timeit.Timer(stmt=fake_stmt, setup=fake_setup, timer=timer)
-    return t.autorange(callback)
+def _autorange_callback(a, b):
+    print("{} {:.3f}".format(a, b))
 
 
-def test_autorange(fake_timer):
-    fake_timer.seconds_per_call = 1/1024
-    num_loops, time_taken = autorange(fake_timer)
-    assert num_loops == 500
-    assert time_taken == 500/1024
+_autorange_text = (
+    '1 0.001\n' +
+    '2 0.002\n' +
+    '5 0.005\n' +
+    '10 0.010\n' +
+    '20 0.020\n' +
+    '50 0.049\n' +
+    '100 0.098\n' +
+    '200 0.195\n' +
+    '500 0.488\n'
+)
 
 
-def test_autorange_second(fake_timer):
-    num_loops, time_taken = autorange(fake_timer)
-    assert num_loops == 1
-    assert time_taken == 1.0
+_autorange_cases = (
+    ('fast', [], 1/1024, 500, 500/1024, {}),
+    ('second', [], 1.0, 1, 1.0, {}),
+    (
+        'callback', [], 1/1024, 500, 500/1024,
+        {'callback': _autorange_callback, 'expected': _autorange_text}
+    )
+)
 
 
-def test_autorange_with_callback(capsys, fake_timer):
-    fake_timer.seconds_per_call = 1/1024
-    def callback(a, b):
-        print("{} {:.3f}".format(a, b))
-    num_loops, time_taken = autorange(fake_timer, callback)
-    captured = capsys.readouterr()
-    assert num_loops == 500
-    assert time_taken == 500/1024
-    expected = ('1 0.001\n'
-                '2 0.002\n'
-                '5 0.005\n'
-                '10 0.010\n'
-                '20 0.020\n'
-                '50 0.049\n'
-                '100 0.098\n'
-                '200 0.195\n'
-                '500 0.488\n')
-    assert captured.out == expected
+@parametrize(
+    _autorange_cases, 'seconds_per_call', 'num_loops', 'time_taken',
+    callback=None, expected=''
+)
+def test_autorange(
+    capsys, fake_timer,
+    seconds_per_call, num_loops, time_taken, callback, expected
+):
+    fake_timer.seconds_per_call = seconds_per_call
+    t = timeit.Timer(stmt=fake_stmt, setup=fake_setup, timer=fake_timer)
+    actual_loops, actual_time = t.autorange(callback)
+    assert actual_loops == num_loops
+    assert actual_time == time_taken
+    result = capsys.readouterr()
+    out, err = result.out, result.err
+    assert out == expected
+    assert not err
