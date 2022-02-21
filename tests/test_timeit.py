@@ -3,7 +3,7 @@ import io, sys
 from textwrap import dedent
 # pytest
 from pytest import fixture, mark, param, raises
-skipif, parametrize = mark.skipif, mark.parametrize
+slow, skipif, parametrize = mark.slow, mark.skipif, mark.parametrize
 del mark
 # code under test
 from peptides import timeit # test our version, not the standard library
@@ -134,6 +134,8 @@ def run_timeit(fake_timer, stmt, setup, number=None, globals=None):
     assert delta_time == number
 
 
+# about 0.6 seconds
+@slow
 def test_timeit_default_iters(fake_timer):
     run_timeit(fake_timer, fake_stmt, fake_setup)
 
@@ -158,6 +160,8 @@ def test_timeit_callable_stmt_and_setup(fake_timer):
     run_timeit(fake_timer, fake_timer.inc, fake_timer.setup, number=3)
 
 
+# about 0.6 seconds
+@slow
 def test_timeit_function(fake_timer):
     delta_time = timeit.timeit(fake_stmt, fake_setup,
             timer=fake_timer)
@@ -203,6 +207,8 @@ def repeat(fake_timer, stmt, setup, repeat=None, number=None):
     assert delta_times == repeat * [float(number)]
 
 
+# about 3 seconds
+@slow
 def test_repeat_default(fake_timer):
     repeat(fake_timer, fake_stmt, fake_setup)
 
@@ -234,6 +240,8 @@ def test_repeat_callable_stmt_and_setup(fake_timer):
             repeat=3, number=5)
 
 
+# about 3 seconds
+@slow
 def test_repeat_function(fake_timer):
     delta_times = timeit.repeat(fake_stmt, fake_setup,
             timer=fake_timer)
