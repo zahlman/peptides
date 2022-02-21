@@ -53,27 +53,22 @@ def does_not_raise():
     yield
 
 
-def test_reindent_empty():
-    assert timeit.reindent("", 0) == ""
-    assert timeit.reindent("", 4) == ""
-
-
-def test_reindent_single():
-    assert timeit.reindent("pass", 0) == "pass"
-    assert timeit.reindent("pass", 4) == "pass"
-
-
-def test_reindent_multi_empty():
-    assert timeit.reindent("\n\n", 0) == "\n\n"
-    assert timeit.reindent("\n\n", 4) == "\n    \n    "
-
-
-def test_reindent_multi():
-    assert timeit.reindent("print()\npass\nbreak", 0) == "print()\npass\nbreak"
-    assert (
-        timeit.reindent("print()\npass\nbreak", 4) == 
-        "print()\n    pass\n    break"
+_reindent_cases = (
+    param('', '', '', id='empty'),
+    param('pass', 'pass', 'pass', id='single'),
+    param('\n\n', '\n\n', '\n    \n    ', id='multi_empty'),
+    param(
+        'print()\npass\nbreak',
+        'print()\npass\nbreak', 'print()\n    pass\n    break',
+        id='multi'
     )
+)
+
+
+@parametrize('text,zero,four', _reindent_cases)
+def test_reindent(text, zero, four):
+    assert timeit.reindent(text, 0) == zero
+    assert timeit.reindent(text, 4) == four
 
 
 _timer_args_cases = (
@@ -124,9 +119,42 @@ fake_setup = "from peptides import timeit\ntimeit._fake_timer.setup()"
 fake_stmt = "from peptides import timeit\ntimeit._fake_timer.inc()"
 
 
-def run_timeit(fake_timer, stmt, setup, number=None, globals=None):
-    t = timeit.Timer(stmt=stmt, setup=setup, timer=fake_timer,
-            globals=globals)
+_timer_class_cases = (
+    ('default_iters', [slow], {}),
+    ('zero_iters', [], {'number': 0}),
+    ('few_iters', [], {'number': 3}),
+    ('callable_stmt', [], {'callable_stmt': True, 'number': 3}),
+    ('callable_setup', [], {'callable_setup': True, 'number': 3}),
+    (
+        'callable_stmt_and_setup', [],
+        {'callable_stmt': True, 'callable_setup': True, 'number': 3}
+    )
+)
+
+
+def _timer_class_param(args):
+    name, marks, kwargs = args
+    callable_stmt = kwargs.get('callable_stmt', False)
+    callable_setup = kwargs.get('callable_setup', False)
+    number = kwargs.get('number', None)
+    globals = kwargs.get('globals', None)
+    return param(
+        callable_stmt, callable_setup, number, globals, id=name, marks=marks
+    )
+
+
+@my_parametrize(
+    'callable_stmt,callable_setup,number,globals',
+    _timer_class_param, _timer_class_cases
+)
+def test_timer_class(
+    fake_timer, callable_stmt, callable_setup, number, globals
+):
+    stmt = fake_timer.inc if callable_stmt else fake_stmt
+    setup = fake_timer.setup if callable_setup else fake_setup
+    t = timeit.Timer(
+        stmt=stmt, setup=setup, timer=fake_timer, globals=globals
+    )
     kwargs = {}
     if number is None:
         number = DEFAULT_NUMBER
@@ -136,32 +164,6 @@ def run_timeit(fake_timer, stmt, setup, number=None, globals=None):
     assert fake_timer.setup_calls == 1
     assert fake_timer.count == number
     assert delta_time == number
-
-
-# about 0.6 seconds
-@slow
-def test_timeit_default_iters(fake_timer):
-    run_timeit(fake_timer, fake_stmt, fake_setup)
-
-
-def test_timeit_zero_iters(fake_timer):
-    run_timeit(fake_timer, fake_stmt, fake_setup, number=0)
-
-
-def test_timeit_few_iters(fake_timer):
-    run_timeit(fake_timer, fake_stmt, fake_setup, number=3)
-
-
-def test_timeit_callable_stmt(fake_timer):
-    run_timeit(fake_timer, fake_timer.inc, fake_setup, number=3)
-
-
-def test_timeit_callable_setup(fake_timer):
-    run_timeit(fake_timer, fake_stmt, fake_timer.setup, number=3)
-
-
-def test_timeit_callable_stmt_and_setup(fake_timer):
-    run_timeit(fake_timer, fake_timer.inc, fake_timer.setup, number=3)
 
 
 # about 0.6 seconds
@@ -194,14 +196,45 @@ def test_timeit_globals_args():
                   globals=locals(), number=3)
 
 
-def repeat(fake_timer, stmt, setup, repeat=None, number=None):
+_repeat_cases = (
+    ('default', [slow], {}), # about 3 seconds
+    ('zero_reps', [], {'repeat': 0}),
+    ('zero_iters', [], {'number': 0}),
+    ('few_reps_and_iters', [], {'repeat': 3, 'number': 5}),
+    ('callable_stmt', [], {'callable_stmt': True, 'repeat': 3, 'number': 5}),
+    ('callable_setup', [], {'callable_setup': True, 'repeat': 3, 'number': 5}),
+    ('callable_stmt_and_setup', [], {
+        'callable_setup': True, 'callable_stmt': True, 'repeat': 3, 'number': 5
+    })
+)
+
+
+def _repeat_param(args):
+    name, marks, kwargs = args
+    callable_stmt = kwargs.get('callable_stmt', False)
+    callable_setup = kwargs.get('callable_setup', False)
+    repeat = kwargs.get('repeat', None)
+    number = kwargs.get('number', None)
+    return param(
+        callable_stmt, callable_setup, repeat, number, id=name, marks=marks
+    )
+
+
+@my_parametrize(
+    'callable_stmt,callable_setup,repeat,number', _repeat_param, _repeat_cases
+)
+def test_repeat(fake_timer, callable_stmt, callable_setup, repeat, number):
+    stmt = fake_timer.inc if callable_stmt else fake_stmt
+    setup = fake_timer.setup if callable_setup else fake_setup
     t = timeit.Timer(stmt=stmt, setup=setup, timer=fake_timer)
     kwargs = {}
     if repeat is None:
+        # Don't put it in kwargs, because we're testing the default values.
         repeat = DEFAULT_REPEAT
     else:
         kwargs['repeat'] = repeat
     if number is None:
+        # Don't put it in kwargs, because we're testing the default values.
         number = DEFAULT_NUMBER
     else:
         kwargs['number'] = number
@@ -209,39 +242,6 @@ def repeat(fake_timer, stmt, setup, repeat=None, number=None):
     assert fake_timer.setup_calls == repeat
     assert fake_timer.count == repeat * number
     assert delta_times == repeat * [float(number)]
-
-
-# about 3 seconds
-@slow
-def test_repeat_default(fake_timer):
-    repeat(fake_timer, fake_stmt, fake_setup)
-
-
-def test_repeat_zero_reps(fake_timer):
-    repeat(fake_timer, fake_stmt, fake_setup, repeat=0)
-
-
-def test_repeat_zero_iters(fake_timer):
-    repeat(fake_timer, fake_stmt, fake_setup, number=0)
-
-
-def test_repeat_few_reps_and_iters(fake_timer):
-    repeat(fake_timer, fake_stmt, fake_setup, repeat=3, number=5)
-
-
-def test_repeat_callable_stmt(fake_timer):
-    repeat(fake_timer, fake_timer.inc, fake_setup,
-            repeat=3, number=5)
-
-
-def test_repeat_callable_setup(fake_timer):
-    repeat(fake_timer, fake_stmt, fake_timer.setup,
-            repeat=3, number=5)
-
-
-def test_repeat_callable_stmt_and_setup(fake_timer):
-    repeat(fake_timer, fake_timer.inc, fake_timer.setup,
-            repeat=3, number=5)
 
 
 # about 3 seconds
@@ -310,11 +310,11 @@ def run_main(capsys, timer, switches=None):
         0.0055, [], id='milliseconds'
     ),
     param(
-        "100 loops, best of 5: 2.5 usec per loop\n", 
+        "100 loops, best of 5: 2.5 usec per loop\n",
         0.0000025, ['-n100'], id='microseconds'
     ),
     param(
-        "35 loops, best of 5: 2 sec per loop\n", 
+        "35 loops, best of 5: 2 sec per loop\n",
         2.0, ['-n35'], id='fixed_iters'
     ),
     param(
