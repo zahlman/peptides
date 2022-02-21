@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from textwrap import dedent
 # pytest
 from pytest import fixture, mark, param
-parametrize, slow, skipif = mark.parametrize, mark.slow, mark.skipif
+slow, skipif = mark.slow, mark.skipif
 del mark
 # test infrastructure
 from .infrastructure import my_parametrize, raises
@@ -51,18 +51,17 @@ def fake_timer():
 
 
 _reindent_cases = (
-    param('', '', '', id='empty'),
-    param('pass', 'pass', 'pass', id='single'),
-    param('\n\n', '\n\n', '\n    \n    ', id='multi_empty'),
-    param(
-        'print()\npass\nbreak',
-        'print()\npass\nbreak', 'print()\n    pass\n    break',
-        id='multi'
+    ('empty', [], '', '', '', {}),
+    ('single', [], 'pass', 'pass', 'pass', {}),
+    ('multi_empty', [], '\n\n', '\n\n', '\n    \n    ', {}),
+    (
+        'multi', [], 'print()\npass\nbreak',
+        'print()\npass\nbreak', 'print()\n    pass\n    break', {}
     )
 )
 
 
-@parametrize('text,zero,four', _reindent_cases)
+@my_parametrize(_reindent_cases, 'text', 'zero', 'four')
 def test_reindent(text, zero, four):
     assert timeit.reindent(text, 0) == zero
     assert timeit.reindent(text, 4) == four
@@ -263,44 +262,51 @@ def run_main(capsys, timer, switches=None):
     return result.out, result.err
 
 
-@parametrize('expected,seconds_per_call,switches', (
-    param(
+_main_out_cases = (
+    (
+        'bad_switch', [], 1.0, ['--bad-switch'],
         'option --bad-switch not recognized\n' +
-        'use -h/--help for command line help\n',
-        1.0, ['--bad-switch'], id='bad_switch'
+        'use -h/--help for command line help\n', {}
     ),
-    param("1 loop, best of 5: 5.5 sec per loop\n", 5.5, [], id='seconds'),
-    param(
-        "50 loops, best of 5: 5.5 msec per loop\n",
-        0.0055, [], id='milliseconds'
+    (
+        'seconds', [], 5.5, [],
+        "1 loop, best of 5: 5.5 sec per loop\n", {}
     ),
-    param(
-        "100 loops, best of 5: 2.5 usec per loop\n",
-        0.0000025, ['-n100'], id='microseconds'
+    (
+        'milliseconds', [], 0.0055, [],
+        "50 loops, best of 5: 5.5 msec per loop\n", {}
     ),
-    param(
-        "35 loops, best of 5: 2 sec per loop\n",
-        2.0, ['-n35'], id='fixed_iters'
+    (
+        'microseconds', [], 0.000_0025, ['-n100'],
+        "100 loops, best of 5: 2.5 usec per loop\n", {}
     ),
-    param(
+    (
+        'fixed_iters', [], 2.0, ['-n35'],
+        "35 loops, best of 5: 2 sec per loop\n", {}
+    ),
+    (
+        'setup', [], 2.0, ['-n35', '-s', 'print("CustomSetup")'],
         "CustomSetup\n" * DEFAULT_REPEAT +
-        "35 loops, best of 5: 2 sec per loop\n",
-        2.0, ['-n35', '-s', 'print("CustomSetup")'], id='setup'
+        "35 loops, best of 5: 2 sec per loop\n", {}
     ),
-    param(
-        "CustomSetup\n" * DEFAULT_REPEAT +
-        "35 loops, best of 5: 2 sec per loop\n",
+    (
+        'multiple_setups', [], 
         2.0, ['-n35', '-s', 'a = "CustomSetup"', '-s', 'print(a)'],
-        id='multiple_setups'
+        "CustomSetup\n" * DEFAULT_REPEAT +
+        "35 loops, best of 5: 2 sec per loop\n", {}
     ),
-    param(
-        "1 loop, best of 9: 60 sec per loop\n", 60.0, ['-r9'], id='fixed_reps'
+    (
+        'fixed_reps', [], 60.0, ['-r9'],
+        "1 loop, best of 9: 60 sec per loop\n", {}
     ),
-    param(
-        "1 loop, best of 1: 60 sec per loop\n", 60.0, ['-r-5'],
-        id='negative_reps'
-    ),
-))
+    (
+        'negative_reps', [], 60.0, ['-r-5'],
+        "1 loop, best of 1: 60 sec per loop\n", {}
+    )
+)
+
+
+@my_parametrize(_main_out_cases, 'seconds_per_call', 'switches', 'expected')
 def test_main_out(capsys, fake_timer, expected, seconds_per_call, switches):
     fake_timer.seconds_per_call = seconds_per_call
     out, err = run_main(capsys, fake_timer, switches=switches)
