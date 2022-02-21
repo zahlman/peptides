@@ -9,22 +9,19 @@ del mark
 from peptides import timeit # test our version, not the standard library
 
 
-# timeit's default number of per-test iterations and test repetitions.
-DEFAULT_NUMBER = 1000000
-DEFAULT_REPEAT = 5
+DEFAULT_NUMBER, DEFAULT_REPEAT = timeit.default_number, timeit.default_repeat
 
 
 class FakeTimer:
     BASE_TIME = 42.0
-    def __init__(self, seconds_per_increment=1.0):
+    def __init__(self):
         self.count = 0
         self.setup_calls = 0
-        self.seconds_per_increment=seconds_per_increment
-        timeit._fake_timer = self
+        self.seconds_per_call = 1.0
 
 
     def __call__(self):
-        return self.BASE_TIME + self.count * self.seconds_per_increment
+        return self.BASE_TIME + self.count * self.seconds_per_call
 
 
     def inc(self):
@@ -43,7 +40,10 @@ class FakeTimer:
 
 @fixture
 def fake_timer():
-    yield FakeTimer()
+    # Put the timer instance somewhere that can be accessed globally,
+    # from dynamically compiled code, without worrying about globals.
+    timeit._fake_timer = FakeTimer()
+    yield timeit._fake_timer
     del timeit._fake_timer
 
 
@@ -158,19 +158,22 @@ def test_timeit_callable_stmt_and_setup(fake_timer):
     run_timeit(fake_timer, fake_timer.inc, fake_timer.setup, number=3)
 
 
-def test_timeit_function():
+def test_timeit_function(fake_timer):
     delta_time = timeit.timeit(fake_stmt, fake_setup,
-            timer=FakeTimer())
+            timer=fake_timer)
     assert delta_time == DEFAULT_NUMBER
 
 
-def test_timeit_function_zero_iters():
+def test_timeit_function_zero_iters(fake_timer):
     delta_time = timeit.timeit(fake_stmt, fake_setup, number=0,
-            timer=FakeTimer())
+            timer=fake_timer)
     assert delta_time == 0
 
 
 def test_timeit_globals_args():
+    # This time, we don't use the fixture because the code is testing
+    # the use of globals and shouldn't be able to "cheat" by getting at
+    # timeit._fake_timer instead.
     global _global_timer
     _global_timer = FakeTimer()
     t = timeit.Timer(stmt='_global_timer.inc()', timer=_global_timer)
@@ -231,21 +234,21 @@ def test_repeat_callable_stmt_and_setup(fake_timer):
             repeat=3, number=5)
 
 
-def test_repeat_function():
+def test_repeat_function(fake_timer):
     delta_times = timeit.repeat(fake_stmt, fake_setup,
-            timer=FakeTimer())
+            timer=fake_timer)
     assert delta_times == DEFAULT_REPEAT * [float(DEFAULT_NUMBER)]
 
 
-def test_repeat_function_zero_reps():
+def test_repeat_function_zero_reps(fake_timer):
     delta_times = timeit.repeat(fake_stmt, fake_setup, repeat=0,
-            timer=FakeTimer())
+            timer=fake_timer)
     assert delta_times == []
 
 
-def test_repeat_function_zero_iters():
+def test_repeat_function_zero_iters(fake_timer):
     delta_times = timeit.repeat(fake_stmt, fake_setup, number=0,
-            timer=FakeTimer())
+            timer=fake_timer)
     assert delta_times == DEFAULT_REPEAT * [0.0]
 
 
@@ -269,9 +272,7 @@ def test_print_exc():
 MAIN_DEFAULT_OUTPUT = "1 loop, best of 5: 1 sec per loop\n"
 
 
-def run_main(capsys, seconds_per_increment=1.0, switches=None, timer=None):
-    if timer is None:
-        timer = FakeTimer(seconds_per_increment=seconds_per_increment)
+def run_main(capsys, timer, switches=None):
     if switches is None:
         args = []
     else:
@@ -285,7 +286,7 @@ def run_main(capsys, seconds_per_increment=1.0, switches=None, timer=None):
     return result.out, result.err
 
 
-@parametrize('expected,seconds_per_increment,switches', (
+@parametrize('expected,seconds_per_call,switches', (
     param(
         'option --bad-switch not recognized\n' +
         'use -h/--help for command line help\n',
@@ -323,25 +324,24 @@ def run_main(capsys, seconds_per_increment=1.0, switches=None, timer=None):
         id='negative_reps'
     ),
 ))
-def test_main_out(capsys, expected, seconds_per_increment, switches):
-    out, err = run_main(
-        capsys, seconds_per_increment=seconds_per_increment, switches=switches
-    )
+def test_main_out(capsys, fake_timer, expected, seconds_per_call, switches):
+    fake_timer.seconds_per_call = seconds_per_call
+    out, err = run_main(capsys, fake_timer, switches=switches)
     assert out == expected
     assert not err
 
 
 @skipif(sys.flags.optimize >= 2, reason="need __doc__")
-def test_main_help(capsys):
-    out, err = run_main(capsys, switches=['-h'])
+def test_main_help(capsys, fake_timer):
+    out, err = run_main(capsys, fake_timer, switches=['-h'])
     # Note: It's not clear that the trailing space was intended as part of
     # the help text, but since it's there, check for it.
     assert out == timeit.__doc__ + ' '
     assert not err
 
 
-def test_main_verbose(capsys):
-    out, err = run_main(capsys, switches=['-v'])
+def test_main_verbose(capsys, fake_timer):
+    out, err = run_main(capsys, fake_timer, switches=['-v'])
     assert out == dedent("""\
             1 loop -> 1 secs
 
@@ -352,8 +352,9 @@ def test_main_verbose(capsys):
     assert not err
 
 
-def test_main_very_verbose(capsys):
-    out, err = run_main(capsys, seconds_per_increment=0.000_030, switches=['-vv'])
+def test_main_very_verbose(capsys, fake_timer):
+    fake_timer.seconds_per_call=0.000_030
+    out, err = run_main(capsys, fake_timer, switches=['-vv'])
     assert out == dedent("""\
             1 loop -> 3e-05 secs
             2 loops -> 6e-05 secs
@@ -376,56 +377,58 @@ def test_main_very_verbose(capsys):
     assert not err
 
 
-def test_main_with_time_unit(capsys):
-    out, err = run_main(capsys, seconds_per_increment=0.003, switches=['-u', 'sec'])
+def test_main_with_time_unit(capsys, fake_timer):
+    fake_timer.seconds_per_call=0.003
+    out, err = run_main(capsys, fake_timer, switches=['-u', 'sec'])
     assert out == "100 loops, best of 5: 0.003 sec per loop\n"
     assert not err
-    out, err = run_main(capsys, seconds_per_increment=0.003, switches=['-u', 'msec'])
+    out, err = run_main(capsys, fake_timer, switches=['-u', 'msec'])
     assert out == "100 loops, best of 5: 3 msec per loop\n"
     assert not err
-    out, err = run_main(capsys, seconds_per_increment=0.003, switches=['-u', 'usec'])
+    out, err = run_main(capsys, fake_timer, switches=['-u', 'usec'])
     assert out == "100 loops, best of 5: 3e+03 usec per loop\n"
     assert not err
     # Test invalid unit input
-    out, err = run_main(capsys, seconds_per_increment=0.003, switches=['-u', 'parsec'])
+    out, err = run_main(capsys, fake_timer, switches=['-u', 'parsec'])
     assert err == "Unrecognized unit. Please select nsec, usec, msec, or sec.\n"
     assert not out
 
 
-def test_main_exception(capsys):
-    out, err = run_main(capsys, switches=['1/0'])
+def test_main_exception(capsys, fake_timer):
+    out, err = run_main(capsys, fake_timer, switches=['1/0'])
     assert not out
     assert_exc_string(err, 'ZeroDivisionError')
 
 
-def test_main_exception_fixed_reps(capsys):
-    out, err = run_main(capsys, switches=['-n1', '1/0'])
+def test_main_exception_fixed_reps(capsys, fake_timer):
+    out, err = run_main(capsys, fake_timer, switches=['-n1', '1/0'])
     assert not out
     assert_exc_string(err, 'ZeroDivisionError')
 
 
-def autorange(seconds_per_increment=1/1024, callback=None):
-    timer = FakeTimer(seconds_per_increment=seconds_per_increment)
+def autorange(timer, callback=None):
     t = timeit.Timer(stmt=fake_stmt, setup=fake_setup, timer=timer)
     return t.autorange(callback)
 
 
-def test_autorange():
-    num_loops, time_taken = autorange()
+def test_autorange(fake_timer):
+    fake_timer.seconds_per_call = 1/1024
+    num_loops, time_taken = autorange(fake_timer)
     assert num_loops == 500
     assert time_taken == 500/1024
 
 
-def test_autorange_second():
-    num_loops, time_taken = autorange(seconds_per_increment=1.0)
+def test_autorange_second(fake_timer):
+    num_loops, time_taken = autorange(fake_timer)
     assert num_loops == 1
     assert time_taken == 1.0
 
 
-def test_autorange_with_callback(capsys):
+def test_autorange_with_callback(capsys, fake_timer):
+    fake_timer.seconds_per_call = 1/1024
     def callback(a, b):
         print("{} {:.3f}".format(a, b))
-    num_loops, time_taken = autorange(callback=callback)
+    num_loops, time_taken = autorange(fake_timer, callback)
     captured = capsys.readouterr()
     assert num_loops == 500
     assert time_taken == 500/1024
