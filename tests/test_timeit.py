@@ -3,9 +3,11 @@ import io, sys
 from contextlib import contextmanager
 from textwrap import dedent
 # pytest
-from pytest import fixture, mark, param, raises
-slow, skipif, parametrize = mark.slow, mark.skipif, mark.parametrize
+from pytest import fixture, mark, param
+parametrize, slow, skipif = mark.parametrize, mark.slow, mark.skipif
 del mark
+# test infrastructure
+from .infrastructure import my_parametrize, raises
 # code under test
 from peptides import timeit # test our version, not the standard library
 
@@ -48,11 +50,6 @@ def fake_timer():
     del timeit._fake_timer
 
 
-@contextmanager
-def does_not_raise():
-    yield
-
-
 _reindent_cases = (
     param('', '', '', id='empty'),
     param('pass', 'pass', 'pass', id='single'),
@@ -72,46 +69,35 @@ def test_reindent(text, zero, four):
 
 
 _timer_args_cases = (
-    ('stmt_none', ValueError, {'stmt': None}),
-    ('stmt_return', SyntaxError, {'stmt': 'return'}),
-    ('stmt_yield', SyntaxError, {'stmt': 'yield'}),
-    ('stmt_yield_from', SyntaxError, {'stmt': 'yield from ()'}),
-    ('stmt_break', SyntaxError, {'stmt': 'break'}),
-    ('stmt_continue', SyntaxError, {'stmt': 'continue'}),
-    ('stmt_import', SyntaxError, {'stmt': 'from timeit import *'}),
-    ('stmt_misaligned', SyntaxError, {'stmt': '  pass'}),
+    ('stmt_none', [], ValueError, {'stmt': None}),
+    ('stmt_return', [], SyntaxError, {'stmt': 'return'}),
+    ('stmt_yield', [], SyntaxError, {'stmt': 'yield'}),
+    ('stmt_yield_from', [], SyntaxError, {'stmt': 'yield from ()'}),
+    ('stmt_break', [], SyntaxError, {'stmt': 'break'}),
+    ('stmt_continue', [], SyntaxError, {'stmt': 'continue'}),
+    ('stmt_import', [], SyntaxError, {'stmt': 'from timeit import *'}),
+    ('stmt_misaligned', [], SyntaxError, {'stmt': '  pass'}),
     (
-        'stmt_misaligned_setup', SyntaxError,
+        'stmt_misaligned_setup', [], SyntaxError,
         {'stmt': '  break', 'setup': 'while False:\n  pass'}
     ),
-    ('stmt_empty', None, {'stmt': ''}),
-    ('stmt_whitespace', None, {'stmt': ' \n\t\f'}),
-    ('stmt_comment', None, {'stmt': '# comment'}),
-    ('setup_none', ValueError, {'setup': None}),
-    ('setup_return', SyntaxError, {'setup': 'return'}),
-    ('setup_yield', SyntaxError, {'setup': 'yield'}),
-    ('setup_yield_from', SyntaxError, {'setup': 'yield from ()'}),
-    ('setup_break', SyntaxError, {'setup': 'break'}),
-    ('setup_continue', SyntaxError, {'setup': 'continue'}),
-    ('setup_import', SyntaxError, {'setup': 'from timeit import *'}),
-    ('setup_misaligned', SyntaxError, {'setup': '  pass'})
+    ('stmt_empty', [], None, {'stmt': ''}),
+    ('stmt_whitespace', [], None, {'stmt': ' \n\t\f'}),
+    ('stmt_comment', [], None, {'stmt': '# comment'}),
+    ('setup_none', [], ValueError, {'setup': None}),
+    ('setup_return', [], SyntaxError, {'setup': 'return'}),
+    ('setup_yield', [], SyntaxError, {'setup': 'yield'}),
+    ('setup_yield_from', [], SyntaxError, {'setup': 'yield from ()'}),
+    ('setup_break', [], SyntaxError, {'setup': 'break'}),
+    ('setup_continue', [], SyntaxError, {'setup': 'continue'}),
+    ('setup_import', [], SyntaxError, {'setup': 'from timeit import *'}),
+    ('setup_misaligned', [], SyntaxError, {'setup': '  pass'})
 )
 
 
-def _timer_args_param(args):
-    name, err, kwargs = args
-    stmt, setup = kwargs.get('stmt', 'pass'), kwargs.get('setup', 'pass')
-    expectation = does_not_raise() if err is None else raises(err)
-    return param(stmt, setup, expectation, id=name)
-
-
-def my_parametrize(names, arg_maker, cases):
-    return parametrize(names, tuple(map(arg_maker, cases)))
-
-
-@my_parametrize('stmt,setup,expectation', _timer_args_param, _timer_args_cases)
-def test_timer_args(stmt, setup, expectation):
-    with expectation:
+@my_parametrize(_timer_args_cases, 'exc', stmt='pass', setup='pass')
+def test_timer_args(stmt, setup, exc):
+    with raises(exc):
         timeit.Timer(stmt=stmt, setup=setup)
 
 
@@ -132,20 +118,9 @@ _timer_class_cases = (
 )
 
 
-def _timer_class_param(args):
-    name, marks, kwargs = args
-    callable_stmt = kwargs.get('callable_stmt', False)
-    callable_setup = kwargs.get('callable_setup', False)
-    number = kwargs.get('number', None)
-    globals = kwargs.get('globals', None)
-    return param(
-        callable_stmt, callable_setup, number, globals, id=name, marks=marks
-    )
-
-
 @my_parametrize(
-    'callable_stmt,callable_setup,number,globals',
-    _timer_class_param, _timer_class_cases
+    _timer_class_cases,
+    callable_stmt=False, callable_setup=False, number=None, globals=None
 )
 def test_timer_class(
     fake_timer, callable_stmt, callable_setup, number, globals
@@ -209,19 +184,9 @@ _repeat_cases = (
 )
 
 
-def _repeat_param(args):
-    name, marks, kwargs = args
-    callable_stmt = kwargs.get('callable_stmt', False)
-    callable_setup = kwargs.get('callable_setup', False)
-    repeat = kwargs.get('repeat', None)
-    number = kwargs.get('number', None)
-    return param(
-        callable_stmt, callable_setup, repeat, number, id=name, marks=marks
-    )
-
-
 @my_parametrize(
-    'callable_stmt,callable_setup,repeat,number', _repeat_param, _repeat_cases
+    _timer_class_cases,
+    callable_stmt=False, callable_setup=False, repeat=None, number=None
 )
 def test_repeat(fake_timer, callable_stmt, callable_setup, repeat, number):
     stmt = fake_timer.inc if callable_stmt else fake_stmt
