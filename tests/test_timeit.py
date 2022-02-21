@@ -296,65 +296,48 @@ def run_main(capsys, seconds_per_increment=1.0, switches=None, timer=None):
     return result.out, result.err
 
 
-@parametrize('expected,options', (
+@parametrize('expected,seconds_per_increment,switches', (
     param(
-        dedent("""\
-            option --bad-switch not recognized
-            use -h/--help for command line help
-            """
-        ),
-        {'switches': ['--bad-switch']},
-        id='bad_switch',
+        'option --bad-switch not recognized\n' +
+        'use -h/--help for command line help\n',
+        1.0, ['--bad-switch'], id='bad_switch'
     ),
+    param("1 loop, best of 5: 5.5 sec per loop\n", 5.5, [], id='seconds'),
     param(
-        "1 loop, best of 5: 5.5 sec per loop\n", 
-        {'seconds_per_increment': 5.5},
-        id='seconds'
-    ),
-    param(
-        "50 loops, best of 5: 5.5 msec per loop\n", 
-        {'seconds_per_increment': 0.0055},
-        id='milliseconds'
+        "50 loops, best of 5: 5.5 msec per loop\n",
+        0.0055, [], id='milliseconds'
     ),
     param(
         "100 loops, best of 5: 2.5 usec per loop\n", 
-        {'seconds_per_increment': 0.0000025, 'switches':['-n100']},
-        id='microseconds'
+        0.0000025, ['-n100'], id='microseconds'
     ),
     param(
         "35 loops, best of 5: 2 sec per loop\n", 
-        {'seconds_per_increment': 2.0, 'switches':['-n35']},
-        id='fixed_iters'
+        2.0, ['-n35'], id='fixed_iters'
     ),
     param(
-        "CustomSetup\n" * DEFAULT_REPEAT + "35 loops, best of 5: 2 sec per loop\n",
-        {
-            'seconds_per_increment': 2.0,
-            'switches':['-n35', '-s', 'print("CustomSetup")']
-        },
-        id='setup'
+        "CustomSetup\n" * DEFAULT_REPEAT +
+        "35 loops, best of 5: 2 sec per loop\n",
+        2.0, ['-n35', '-s', 'print("CustomSetup")'], id='setup'
     ),
     param(
-        "CustomSetup\n" * DEFAULT_REPEAT + "35 loops, best of 5: 2 sec per loop\n",
-        {
-            'seconds_per_increment': 2.0,
-            'switches':['-n35', '-s', 'a = "CustomSetup"', '-s', 'print(a)']
-        },
+        "CustomSetup\n" * DEFAULT_REPEAT +
+        "35 loops, best of 5: 2 sec per loop\n",
+        2.0, ['-n35', '-s', 'a = "CustomSetup"', '-s', 'print(a)'],
         id='multiple_setups'
     ),
     param(
-        "1 loop, best of 9: 60 sec per loop\n",
-        {'seconds_per_increment': 60.0, 'switches':['-r9']},
-        id='fixed_reps'
+        "1 loop, best of 9: 60 sec per loop\n", 60.0, ['-r9'], id='fixed_reps'
     ),
     param(
-        "1 loop, best of 1: 60 sec per loop\n",
-        {'seconds_per_increment': 60.0, 'switches':['-r-5']},
+        "1 loop, best of 1: 60 sec per loop\n", 60.0, ['-r-5'],
         id='negative_reps'
     ),
 ))
-def test_main_out(capsys, expected, options):
-    out, err = run_main(capsys, **options)
+def test_main_out(capsys, expected, seconds_per_increment, switches):
+    out, err = run_main(
+        capsys, seconds_per_increment=seconds_per_increment, switches=switches
+    )
     assert out == expected
     assert not err
 
