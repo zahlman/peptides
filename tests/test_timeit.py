@@ -14,13 +14,6 @@ DEFAULT_NUMBER = 1000000
 DEFAULT_REPEAT = 5
 
 
-# XXX: some tests are commented out that would improve the coverage but take a
-# long time to run because they test the default number of loops, which is
-# large.  The tests could be enabled if there was a way to override the default
-# number of loops during testing, but this would require changing the signature
-# of some functions that use the default as a default argument.
-
-
 class FakeTimer:
     BASE_TIME = 42.0
     def __init__(self, seconds_per_increment=1.0):
@@ -141,9 +134,8 @@ def run_timeit(fake_timer, stmt, setup, number=None, globals=None):
     assert delta_time == number
 
 
-# Takes too long to run in debug build.
-#def test_timeit_default_iters(fake_timer):
-#    run_timeit(fake_timer, fake_stmt, fake_setup)
+def test_timeit_default_iters(fake_timer):
+    run_timeit(fake_timer, fake_stmt, fake_setup)
 
 
 def test_timeit_zero_iters(fake_timer):
@@ -166,11 +158,10 @@ def test_timeit_callable_stmt_and_setup(fake_timer):
     run_timeit(fake_timer, fake_timer.inc, fake_timer.setup, number=3)
 
 
-# Takes too long to run in debug build.
-#def test_timeit_function():
-#    delta_time = timeit.timeit(fake_stmt, fake_setup,
-#            timer=FakeTimer())
-#    assert delta_time == DEFAULT_NUMBER
+def test_timeit_function():
+    delta_time = timeit.timeit(fake_stmt, fake_setup,
+            timer=FakeTimer())
+    assert delta_time == DEFAULT_NUMBER
 
 
 def test_timeit_function_zero_iters():
@@ -209,9 +200,8 @@ def repeat(fake_timer, stmt, setup, repeat=None, number=None):
     assert delta_times == repeat * [float(number)]
 
 
-# Takes too long to run in debug build.
-#def test_repeat_default(fake_timer):
-#    repeat(fake_timerfake_stmt, fake_setup)
+def test_repeat_default(fake_timer):
+    repeat(fake_timer, fake_stmt, fake_setup)
 
 
 def test_repeat_zero_reps(fake_timer):
@@ -241,11 +231,10 @@ def test_repeat_callable_stmt_and_setup(fake_timer):
             repeat=3, number=5)
 
 
-# Takes too long to run in debug build.
-#def test_repeat_function():
-#    delta_times = timeit.repeat(fake_stmt, fake_setup,
-#            timer=FakeTimer())
-#    assertEqual(delta_times, DEFAULT_REPEAT * [float(DEFAULT_NUMBER)])
+def test_repeat_function():
+    delta_times = timeit.repeat(fake_stmt, fake_setup,
+            timer=FakeTimer())
+    assert delta_times == DEFAULT_REPEAT * [float(DEFAULT_NUMBER)]
 
 
 def test_repeat_function_zero_reps():
