@@ -2,7 +2,7 @@
 import io, sys
 from textwrap import dedent
 # pytest
-from pytest import fixture, mark, raises
+from pytest import fixture, mark, param, raises
 skipif, parametrize = mark.skipif, mark.parametrize
 del mark
 # code under test
@@ -296,62 +296,66 @@ def run_main(capsys, seconds_per_increment=1.0, switches=None, timer=None):
     return result.out, result.err
 
 
-def test_main_bad_switch(capsys):
-    out, err = run_main(capsys, switches=['--bad-switch'])
-    assert out == dedent("""\
-        option --bad-switch not recognized
-        use -h/--help for command line help
-        """)
-    assert not err
-
-
-def test_main_seconds(capsys):
-    out, err = run_main(capsys, seconds_per_increment=5.5)
-    assert out == "1 loop, best of 5: 5.5 sec per loop\n"
-    assert not err
-
-
-def test_main_milliseconds(capsys):
-    out, err = run_main(capsys, seconds_per_increment=0.0055)
-    assert out == "50 loops, best of 5: 5.5 msec per loop\n"
-    assert not err
-
-
-def test_main_microseconds(capsys):
-    out, err = run_main(capsys, seconds_per_increment=0.0000025, switches=['-n100'])
-    assert out == "100 loops, best of 5: 2.5 usec per loop\n"
-    assert not err
-
-
-def test_main_fixed_iters(capsys):
-    out, err = run_main(capsys, seconds_per_increment=2.0, switches=['-n35'])
-    assert out == "35 loops, best of 5: 2 sec per loop\n"
-    assert not err
-
-
-def test_main_setup(capsys):
-    out, err = run_main(capsys, seconds_per_increment=2.0,
-            switches=['-n35', '-s', 'print("CustomSetup")'])
-    assert out == "CustomSetup\n" * DEFAULT_REPEAT + "35 loops, best of 5: 2 sec per loop\n"
-    assert not err
-
-
-def test_main_multiple_setups(capsys):
-    out, err = run_main(capsys, seconds_per_increment=2.0,
-            switches=['-n35', '-s', 'a = "CustomSetup"', '-s', 'print(a)'])
-    assert out == "CustomSetup\n" * DEFAULT_REPEAT + "35 loops, best of 5: 2 sec per loop\n"
-    assert not err
-
-
-def test_main_fixed_reps(capsys):
-    out, err = run_main(capsys, seconds_per_increment=60.0, switches=['-r9'])
-    assert out == "1 loop, best of 9: 60 sec per loop\n"
-    assert not err
-
-
-def test_main_negative_reps(capsys):
-    out, err = run_main(capsys, seconds_per_increment=60.0, switches=['-r-5'])
-    assert out == "1 loop, best of 1: 60 sec per loop\n"
+@parametrize('expected,options', (
+    param(
+        dedent("""\
+            option --bad-switch not recognized
+            use -h/--help for command line help
+            """
+        ),
+        {'switches': ['--bad-switch']},
+        id='bad_switch',
+    ),
+    param(
+        "1 loop, best of 5: 5.5 sec per loop\n", 
+        {'seconds_per_increment': 5.5},
+        id='seconds'
+    ),
+    param(
+        "50 loops, best of 5: 5.5 msec per loop\n", 
+        {'seconds_per_increment': 0.0055},
+        id='milliseconds'
+    ),
+    param(
+        "100 loops, best of 5: 2.5 usec per loop\n", 
+        {'seconds_per_increment': 0.0000025, 'switches':['-n100']},
+        id='microseconds'
+    ),
+    param(
+        "35 loops, best of 5: 2 sec per loop\n", 
+        {'seconds_per_increment': 2.0, 'switches':['-n35']},
+        id='fixed_iters'
+    ),
+    param(
+        "CustomSetup\n" * DEFAULT_REPEAT + "35 loops, best of 5: 2 sec per loop\n",
+        {
+            'seconds_per_increment': 2.0,
+            'switches':['-n35', '-s', 'print("CustomSetup")']
+        },
+        id='setup'
+    ),
+    param(
+        "CustomSetup\n" * DEFAULT_REPEAT + "35 loops, best of 5: 2 sec per loop\n",
+        {
+            'seconds_per_increment': 2.0,
+            'switches':['-n35', '-s', 'a = "CustomSetup"', '-s', 'print(a)']
+        },
+        id='multiple_setups'
+    ),
+    param(
+        "1 loop, best of 9: 60 sec per loop\n",
+        {'seconds_per_increment': 60.0, 'switches':['-r9']},
+        id='fixed_reps'
+    ),
+    param(
+        "1 loop, best of 1: 60 sec per loop\n",
+        {'seconds_per_increment': 60.0, 'switches':['-r-5']},
+        id='negative_reps'
+    ),
+))
+def test_main_out(capsys, expected, options):
+    out, err = run_main(capsys, **options)
+    assert out == expected
     assert not err
 
 
