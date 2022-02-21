@@ -302,91 +302,82 @@ _main_out_cases = (
     (
         'negative_reps', [], 60.0, ['-r-5'],
         "1 loop, best of 1: 60 sec per loop\n", {}
+    ),
+    (
+        'help', [skipif(sys.flags.optimize >= 2, reason="need __doc__")],
+        # Note: It's not clear that the trailing space was intended as part of
+        # the help text, but since it's there, check for it.
+        1.0, ['-h'], timeit.__doc__ + ' ', {}
+    ),
+    (
+        'verbose', [], 1.0, ['-v'],
+        '1 loop -> 1 secs\n\n' +
+        'raw times: 1 sec, 1 sec, 1 sec, 1 sec, 1 sec\n\n' +
+        '1 loop, best of 5: 1 sec per loop\n', {}
+    ),
+    (
+        'very_verbose', [], 0.000_030, ['-vv'],
+        '1 loop -> 3e-05 secs\n' +
+        '2 loops -> 6e-05 secs\n' +
+        '5 loops -> 0.00015 secs\n' +
+        '10 loops -> 0.0003 secs\n' +
+        '20 loops -> 0.0006 secs\n' +
+        '50 loops -> 0.0015 secs\n' +
+        '100 loops -> 0.003 secs\n' +
+        '200 loops -> 0.006 secs\n' +
+        '500 loops -> 0.015 secs\n' +
+        '1000 loops -> 0.03 secs\n' +
+        '2000 loops -> 0.06 secs\n' +
+        '5000 loops -> 0.15 secs\n' +
+        '10000 loops -> 0.3 secs\n\n' +
+        'raw times: 300 msec, 300 msec, 300 msec, 300 msec, 300 msec\n\n' +
+        '10000 loops, best of 5: 30 usec per loop\n', {}
+    ),
+    (
+        'time_sec', [], 0.003, ['-u', 'sec'],
+        "100 loops, best of 5: 0.003 sec per loop\n", {}
+    ),
+    (
+        'time_msec', [], 0.003, ['-u', 'msec'],
+        "100 loops, best of 5: 3 msec per loop\n", {}
+    ),
+    (
+        'time_usec', [], 0.003, ['-u', 'usec'],
+        "100 loops, best of 5: 3e+03 usec per loop\n", {}
+    ),
+    (
+        'time_parsec', [], 0.003, ['-u', 'parsec'],
+        'Unrecognized unit. Please select nsec, usec, msec, or sec.\n',
+        {'verify': 'err'}
+    ),
+    (
+        'exception', [], 1.0, ['1/0'],
+        'ZeroDivisionError', {'verify': 'exc'}
+    ),
+    (
+        'exception_fixed_reps', [], 1.0, ['-n1', '1/0'],
+        'ZeroDivisionError', {'verify': 'exc'}
     )
 )
 
 
-@parametrize(_main_out_cases, 'seconds_per_call', 'switches', 'expected')
-def test_main_out(capsys, fake_timer, expected, seconds_per_call, switches):
+@parametrize(
+    _main_out_cases, 'seconds_per_call', 'switches', 'expected', verify=None
+)
+def test_main_out(
+    capsys, fake_timer, expected, seconds_per_call, switches, verify 
+):
     fake_timer.seconds_per_call = seconds_per_call
     out, err = run_main(capsys, fake_timer, switches=switches)
-    assert out == expected
-    assert not err
-
-
-@skipif(sys.flags.optimize >= 2, reason="need __doc__")
-def test_main_help(capsys, fake_timer):
-    out, err = run_main(capsys, fake_timer, switches=['-h'])
-    # Note: It's not clear that the trailing space was intended as part of
-    # the help text, but since it's there, check for it.
-    assert out == timeit.__doc__ + ' '
-    assert not err
-
-
-def test_main_verbose(capsys, fake_timer):
-    out, err = run_main(capsys, fake_timer, switches=['-v'])
-    assert out == dedent("""\
-            1 loop -> 1 secs
-
-            raw times: 1 sec, 1 sec, 1 sec, 1 sec, 1 sec
-
-            1 loop, best of 5: 1 sec per loop
-        """)
-    assert not err
-
-
-def test_main_very_verbose(capsys, fake_timer):
-    fake_timer.seconds_per_call=0.000_030
-    out, err = run_main(capsys, fake_timer, switches=['-vv'])
-    assert out == dedent("""\
-            1 loop -> 3e-05 secs
-            2 loops -> 6e-05 secs
-            5 loops -> 0.00015 secs
-            10 loops -> 0.0003 secs
-            20 loops -> 0.0006 secs
-            50 loops -> 0.0015 secs
-            100 loops -> 0.003 secs
-            200 loops -> 0.006 secs
-            500 loops -> 0.015 secs
-            1000 loops -> 0.03 secs
-            2000 loops -> 0.06 secs
-            5000 loops -> 0.15 secs
-            10000 loops -> 0.3 secs
-
-            raw times: 300 msec, 300 msec, 300 msec, 300 msec, 300 msec
-
-            10000 loops, best of 5: 30 usec per loop
-        """)
-    assert not err
-
-
-def test_main_with_time_unit(capsys, fake_timer):
-    fake_timer.seconds_per_call=0.003
-    out, err = run_main(capsys, fake_timer, switches=['-u', 'sec'])
-    assert out == "100 loops, best of 5: 0.003 sec per loop\n"
-    assert not err
-    out, err = run_main(capsys, fake_timer, switches=['-u', 'msec'])
-    assert out == "100 loops, best of 5: 3 msec per loop\n"
-    assert not err
-    out, err = run_main(capsys, fake_timer, switches=['-u', 'usec'])
-    assert out == "100 loops, best of 5: 3e+03 usec per loop\n"
-    assert not err
-    # Test invalid unit input
-    out, err = run_main(capsys, fake_timer, switches=['-u', 'parsec'])
-    assert err == "Unrecognized unit. Please select nsec, usec, msec, or sec.\n"
-    assert not out
-
-
-def test_main_exception(capsys, fake_timer):
-    out, err = run_main(capsys, fake_timer, switches=['1/0'])
-    assert not out
-    assert_exc_string(err, 'ZeroDivisionError')
-
-
-def test_main_exception_fixed_reps(capsys, fake_timer):
-    out, err = run_main(capsys, fake_timer, switches=['-n1', '1/0'])
-    assert not out
-    assert_exc_string(err, 'ZeroDivisionError')
+    if verify == 'exc':
+        assert_exc_string(err, expected)
+        assert not out
+    elif verify == 'err':
+        assert err == expected
+        assert not out
+    else:
+        assert out == expected
+        assert not err
 
 
 def autorange(timer, callback=None):
