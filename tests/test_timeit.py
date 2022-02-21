@@ -7,7 +7,7 @@ from pytest import fixture, mark, param
 slow, skipif = mark.slow, mark.skipif
 del mark
 # test infrastructure
-from .infrastructure import my_parametrize, raises
+from .infrastructure import parametrize, raises
 # code under test
 from peptides import timeit # test our version, not the standard library
 
@@ -61,7 +61,7 @@ _reindent_cases = (
 )
 
 
-@my_parametrize(_reindent_cases, 'text', 'zero', 'four')
+@parametrize(_reindent_cases, 'text', 'zero', 'four')
 def test_reindent(text, zero, four):
     assert timeit.reindent(text, 0) == zero
     assert timeit.reindent(text, 4) == four
@@ -94,7 +94,7 @@ _timer_args_cases = (
 )
 
 
-@my_parametrize(_timer_args_cases, 'exc', stmt='pass', setup='pass')
+@parametrize(_timer_args_cases, 'exc', stmt='pass', setup='pass')
 def test_timer_args(stmt, setup, exc):
     with raises(exc):
         timeit.Timer(stmt=stmt, setup=setup)
@@ -117,7 +117,7 @@ _timer_class_cases = (
 )
 
 
-@my_parametrize(
+@parametrize(
     _timer_class_cases,
     callable_stmt=False, callable_setup=False, number=None, globals=None
 )
@@ -183,7 +183,7 @@ _repeat_cases = (
 )
 
 
-@my_parametrize(
+@parametrize(
     _timer_class_cases,
     callable_stmt=False, callable_setup=False, repeat=None, number=None
 )
@@ -290,7 +290,7 @@ _main_out_cases = (
         "35 loops, best of 5: 2 sec per loop\n", {}
     ),
     (
-        'multiple_setups', [], 
+        'multiple_setups', [],
         2.0, ['-n35', '-s', 'a = "CustomSetup"', '-s', 'print(a)'],
         "CustomSetup\n" * DEFAULT_REPEAT +
         "35 loops, best of 5: 2 sec per loop\n", {}
@@ -306,7 +306,7 @@ _main_out_cases = (
 )
 
 
-@my_parametrize(_main_out_cases, 'seconds_per_call', 'switches', 'expected')
+@parametrize(_main_out_cases, 'seconds_per_call', 'switches', 'expected')
 def test_main_out(capsys, fake_timer, expected, seconds_per_call, switches):
     fake_timer.seconds_per_call = seconds_per_call
     out, err = run_main(capsys, fake_timer, switches=switches)

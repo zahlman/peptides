@@ -22,14 +22,10 @@ def make_parameter(args, required_count, defaults):
     return param(*required, id=test_name, marks=marks)
 
 
-def my_parametrize(cases, *required_arg_names, **defaults):
+def parametrize(cases, *required_arg_names, **defaults):
     count = len(required_arg_names)
     assert count == len(set(required_arg_names))
     arg_names = ','.join(required_arg_names + tuple(defaults.keys()))
     return mark.parametrize(arg_names, tuple(
         make_parameter(args, count, defaults) for args in cases
     ))
-
-
-def parametrize(*args, **kwargs):
-    return mark.parametrize(*args, **kwargs)
