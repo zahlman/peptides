@@ -312,9 +312,6 @@ def test_repeat_function_zero_iters(fake_timer):
 # MAIN FUNCTION
 
 
-MAIN_DEFAULT_OUTPUT = "1 loop, best of 5: 1 sec per loop\n"
-
-
 def run_main(capsys, timer, switches=None):
     if switches is None:
         args = []
