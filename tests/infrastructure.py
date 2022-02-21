@@ -15,7 +15,8 @@ def raises(exc):
 
 def make_parameter(args, required_count, defaults):
     test_name, marks, *required, optional = args
-    assert len(required) == required_count
+    if len(required) != required_count:
+        raise TypeError(f'expected {required_count} arguments, got {required}')
     for name, value in defaults.items():
         required.append(optional.get(name, value))
     return param(*required, id=test_name, marks=marks)
