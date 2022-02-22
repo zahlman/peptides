@@ -1,5 +1,5 @@
 # standard library
-import io, sys
+import sys
 # pytest
 from pytest import fixture, mark
 slow, skipif = mark.slow, mark.skipif
@@ -217,14 +217,13 @@ def test_autorange(
 # PRINT_EXC METHOD
 
 
-def test_print_exc():
-    s = io.StringIO()
+def test_print_exc(capsys):
     t = timeit.Timer("1/0")
     try:
         t.timeit()
     except:
-        t.print_exc(s)
-    assert_exc_string(s.getvalue(), 'ZeroDivisionError')
+        t.print_exc()
+    assert_exc_string(capsys.readouterr().err, 'ZeroDivisionError')
 
 
 # REINDENT FUNCTION
