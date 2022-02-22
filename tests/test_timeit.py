@@ -35,12 +35,6 @@ class FakeTimer:
         self.setup_calls += 1
 
 
-    def wrap_timer(self, timer):
-        """Records 'timer' and returns self as callable timer."""
-        self.saved_timer = timer
-        return self
-
-
 @fixture
 def fake_timer():
     # Put the timer instance somewhere that can be accessed globally,
@@ -320,7 +314,7 @@ def run_main(capsys, timer, switches=None):
     args.append(fake_stmt)
     # timeit.main() modifies sys.path, so save and restore it.
     orig_sys_path = sys.path[:]
-    timeit.main(args=args, _wrap_timer=timer.wrap_timer)
+    timeit.main(args=args, _wrap_timer=lambda t:timer)
     result = capsys.readouterr()
     sys.path[:] = orig_sys_path[:]
     return result.out, result.err
