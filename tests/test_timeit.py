@@ -293,20 +293,6 @@ def test_timeit_globals_args():
 # MAIN FUNCTION
 
 
-def run_main(capsys, timer, switches=None):
-    if switches is None:
-        args = []
-    else:
-        args = switches[:]
-    args.append(fake_stmt)
-    # timeit.main() modifies sys.path, so save and restore it.
-    orig_sys_path = sys.path[:]
-    timeit.main(args=args, _wrap_timer=lambda t:timer)
-    result = capsys.readouterr()
-    sys.path[:] = orig_sys_path[:]
-    return result.out, result.err
-
-
 _main_out_cases = (
     (
         'bad_switch', [], 1.0, ['--bad-switch'],
@@ -397,7 +383,14 @@ def test_main_out(
     capsys, fake_timer, expected, seconds_per_call, switches, verify
 ):
     fake_timer.seconds_per_call = seconds_per_call
-    out, err = run_main(capsys, fake_timer, switches=switches)
+    args = switches + [fake_stmt]
+    # timeit.main() modifies sys.path, so save and restore it.
+    orig_sys_path = sys.path[:]
+    timeit.main(args=args, _wrap_timer=lambda timer:fake_timer)
+    sys.path[:] = orig_sys_path[:]
+    # Validate stdout and stderr results.
+    result = capsys.readouterr()
+    out, err = result.out, result.err
     if verify == 'exc':
         assert_exc_string(err, expected)
         assert not out
