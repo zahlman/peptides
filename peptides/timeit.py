@@ -49,19 +49,21 @@ Functions:
 
 """
 
-import gc
-import sys
-import time
-import itertools
+
+import gc, getopt, itertools, linecache, os, sys, time, traceback, warnings
+
 
 __all__ = ["Timer", "timeit", "repeat", "default_timer"]
+
 
 dummy_src_name = "<timeit-src>"
 default_number = 1000000
 default_repeat = 5
 default_timer = time.perf_counter
 
+
 _globals = globals
+
 
 # Don't change the indentation of the template; the reindent() calls
 # in Timer.__init__() depend on setup being indented 4 spaces and stmt
@@ -77,9 +79,11 @@ def inner(_it, _timer{init}):
     return _t1 - _t0
 """
 
+
 def reindent(src, indent):
     """Helper to reindent a multi-line statement."""
     return src.replace("\n", "\n" + " "*indent)
+
 
 class Timer:
     """Class for timing execution speed of small code snippets.
@@ -98,9 +102,9 @@ class Timer:
     The statements may contain newlines, as long as they don't contain
     multi-line string literals.
     """
-
-    def __init__(self, stmt="pass", setup="pass", timer=default_timer,
-                 globals=None):
+    def __init__(
+        self, stmt="pass", setup="pass", timer=default_timer, globals=None
+    ):
         """Constructor.  See class doc string."""
         self.timer = timer
         local_ns = {}
@@ -134,6 +138,7 @@ class Timer:
         exec(code, global_ns, local_ns)
         self.inner = local_ns["inner"]
 
+
     def print_exc(self, file=None):
         """Helper to print a traceback from the timed code.
 
@@ -151,15 +156,13 @@ class Timer:
         The optional file argument directs where the traceback is
         sent; it defaults to sys.stderr.
         """
-        import linecache, traceback
         if self.src is not None:
-            linecache.cache[dummy_src_name] = (len(self.src),
-                                               None,
-                                               self.src.split("\n"),
-                                               dummy_src_name)
+            linecache.cache[dummy_src_name] = (
+                len(self.src), None, self.src.split("\n"), dummy_src_name
+            )
         # else the source is already stored somewhere else
-
         traceback.print_exc(file=file)
+
 
     def timeit(self, number=default_number):
         """Time 'number' executions of the main statement.
@@ -180,6 +183,7 @@ class Timer:
             if gcold:
                 gc.enable()
         return timing
+
 
     def repeat(self, repeat=default_repeat, number=default_number):
         """Call timeit() a few times.
@@ -207,6 +211,7 @@ class Timer:
             r.append(t)
         return r
 
+
     def autorange(self, callback=None):
         """Return the number of loops and time taken so that total time >= 0.2.
 
@@ -228,15 +233,22 @@ class Timer:
                     return (number, time_taken)
             i *= 10
 
-def timeit(stmt="pass", setup="pass", timer=default_timer,
-           number=default_number, globals=None):
+
+def timeit(
+    stmt="pass", setup="pass", timer=default_timer,
+    number=default_number, globals=None
+):
     """Convenience function to create Timer object and call timeit method."""
     return Timer(stmt, setup, timer, globals).timeit(number)
 
-def repeat(stmt="pass", setup="pass", timer=default_timer,
-           repeat=default_repeat, number=default_number, globals=None):
+
+def repeat(
+    stmt="pass", setup="pass", timer=default_timer,
+    repeat=default_repeat, number=default_number, globals=None
+):
     """Convenience function to create Timer object and call repeat method."""
     return Timer(stmt, setup, timer, globals).repeat(repeat, number)
+
 
 def main(args=None, *, _wrap_timer=None):
     """Main program, used when run as a script.
@@ -257,12 +269,14 @@ def main(args=None, *, _wrap_timer=None):
     """
     if args is None:
         args = sys.argv[1:]
-    import getopt
     try:
-        opts, args = getopt.getopt(args, "n:u:s:r:tcpvh",
-                                   ["number=", "setup=", "repeat=",
-                                    "time", "clock", "process",
-                                    "verbose", "unit=", "help"])
+        opts, args = getopt.getopt(
+            args, "n:u:s:r:tcpvh", [
+                "number=", "setup=", "repeat=",
+                "time", "clock", "process",
+                "verbose", "unit=", "help"
+            ]
+        )
     except getopt.error as err:
         print(err)
         print("use -h/--help for command line help")
@@ -307,7 +321,6 @@ def main(args=None, *, _wrap_timer=None):
     # Include the current directory, so that local imports work (sys.path
     # contains the directory of this script, rather than the current
     # directory)
-    import os
     sys.path.insert(0, os.curdir)
     if _wrap_timer is not None:
         timer = _wrap_timer(timer)
@@ -357,20 +370,23 @@ def main(args=None, *, _wrap_timer=None):
     timings = [dt / number for dt in raw_timings]
 
     best = min(timings)
-    print("%d loop%s, best of %d: %s per loop"
-          % (number, 's' if number != 1 else '',
-             repeat, format_time(best)))
+    print("%d loop%s, best of %d: %s per loop" % (
+        number, 's' if number != 1 else '', repeat, format_time(best)
+    ))
 
     best = min(timings)
     worst = max(timings)
     if worst >= best * 4:
-        import warnings
-        warnings.warn_explicit("The test results are likely unreliable. "
-                               "The worst time (%s) was more than four times "
-                               "slower than the best time (%s)."
-                               % (format_time(worst), format_time(best)),
-                               UserWarning, '', 0)
+        warnings.warn_explicit(
+            "The test results are likely unreliable. "
+            "The worst time (%s) was more than four times "
+            "slower than the best time (%s)." % (
+                format_time(worst), format_time(best)
+            ),
+            UserWarning, '', 0
+        )
     return None
+
 
 if __name__ == "__main__":
     sys.exit(main())
