@@ -246,21 +246,28 @@ def test_reindent(text, zero, four):
     assert timeit.reindent(text, 4) == four
 
 
-# TIMEIT FUNCTION
+# TIMEIT AND REPEAT FUNCTIONS
 
 
-# about 0.6 seconds
-@slow
-def test_timeit_function(fake_timer):
-    delta_time = timeit.timeit(fake_stmt, fake_setup,
-            timer=fake_timer)
-    assert delta_time == DEFAULT_NUMBER
+_timeit_and_repeat_cases = (
+    # about 0.6 seconds
+    ('timeit_default_iters', [slow], timeit.timeit, {}, DEFAULT_NUMBER, {}),
+    ('timeit_zero_iters', [], timeit.timeit, {'number': 0}, 0, {}),
+    (
+        'default', [slow], timeit.repeat, {}, # about 3 seconds
+        DEFAULT_REPEAT * [float(DEFAULT_NUMBER)], {}
+    ),
+    ('zero_reps', [], timeit.repeat, {'repeat': 0}, [], {}),
+    ('zero_iters', [], timeit.repeat, {'number': 0}, DEFAULT_REPEAT * [0.0], {})
+)
 
 
-def test_timeit_function_zero_iters(fake_timer):
-    delta_time = timeit.timeit(fake_stmt, fake_setup, number=0,
-            timer=fake_timer)
-    assert delta_time == 0
+@parametrize(_timeit_and_repeat_cases, 'func', 'kwargs', 'expected')
+def test_functions(fake_timer, func, kwargs, expected):
+    assert func(fake_stmt, fake_setup, timer=fake_timer, **kwargs) == expected
+
+
+# GLOBAL ARGUMENTS
 
 
 def test_timeit_globals_args():
@@ -272,34 +279,15 @@ def test_timeit_globals_args():
     t = timeit.Timer(stmt='_global_timer.inc()', timer=_global_timer)
     with raises(NameError):
         t.timeit(number=3)
-    timeit.timeit(stmt='_global_timer.inc()', timer=_global_timer,
-                  globals=globals(), number=3)
+    timeit.timeit(
+        stmt='_global_timer.inc()', timer=_global_timer,
+        globals=globals(), number=3
+    )
     local_timer = FakeTimer()
-    timeit.timeit(stmt='local_timer.inc()', timer=local_timer,
-                  globals=locals(), number=3)
-
-
-# REPEAT FUNCTION
-
-
-# about 3 seconds
-@slow
-def test_repeat_function(fake_timer):
-    delta_times = timeit.repeat(fake_stmt, fake_setup,
-            timer=fake_timer)
-    assert delta_times == DEFAULT_REPEAT * [float(DEFAULT_NUMBER)]
-
-
-def test_repeat_function_zero_reps(fake_timer):
-    delta_times = timeit.repeat(fake_stmt, fake_setup, repeat=0,
-            timer=fake_timer)
-    assert delta_times == []
-
-
-def test_repeat_function_zero_iters(fake_timer):
-    delta_times = timeit.repeat(fake_stmt, fake_setup, number=0,
-            timer=fake_timer)
-    assert delta_times == DEFAULT_REPEAT * [0.0]
+    timeit.timeit(
+        stmt='local_timer.inc()', timer=local_timer,
+        globals=locals(), number=3
+    )
 
 
 # MAIN FUNCTION
