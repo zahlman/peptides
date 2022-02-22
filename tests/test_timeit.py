@@ -354,9 +354,7 @@ _main_out_cases = (
         "1 loop, best of 1: 60 sec per loop\n", {}
     ), (
         'help', [skipif(sys.flags.optimize >= 2, reason="need __doc__")],
-        # Note: It's not clear that the trailing space was intended as part of
-        # the help text, but since it's there, check for it.
-        1.0, ['-h'], timeit.__doc__ + ' ', {}
+        1.0, ['-h'], timeit.__doc__, {}
     ), (
         'verbose', [], 1.0, ['-v'],
         '1 loop -> 1 secs\n\n' +
