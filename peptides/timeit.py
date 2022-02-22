@@ -83,7 +83,7 @@ def inner(_it, _timer{init}):
 """
 
 
-def reindent(src, indent):
+def _reindent(src, indent):
     """Helper to reindent a multi-line statement."""
     return src.replace("\n", "\n" + " "*indent)
 
@@ -117,7 +117,7 @@ class Timer:
             # Check that the code can be compiled outside a function
             compile(setup, dummy_src_name, "exec")
             stmtprefix = setup + '\n'
-            setup = reindent(setup, 4)
+            setup = _reindent(setup, 4)
         elif callable(setup):
             local_ns['_setup'] = setup
             init += ', _setup=_setup'
@@ -128,7 +128,7 @@ class Timer:
         if isinstance(stmt, str):
             # Check that the code can be compiled outside a function
             compile(stmtprefix + stmt, dummy_src_name, "exec")
-            stmt = reindent(stmt, 8)
+            stmt = _reindent(stmt, 8)
         elif callable(stmt):
             local_ns['_stmt'] = stmt
             init += ', _stmt=_stmt'

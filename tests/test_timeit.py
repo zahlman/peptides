@@ -226,26 +226,6 @@ def test_print_exc(capsys):
     assert_exc_string(capsys.readouterr().err, 'ZeroDivisionError')
 
 
-# REINDENT FUNCTION
-
-
-_reindent_cases = (
-    ('empty', [], '', '', '', {}),
-    ('single', [], 'pass', 'pass', 'pass', {}),
-    ('multi_empty', [], '\n\n', '\n\n', '\n    \n    ', {}),
-    (
-        'multi', [], 'print()\npass\nbreak',
-        'print()\npass\nbreak', 'print()\n    pass\n    break', {}
-    )
-)
-
-
-@parametrize(_reindent_cases, 'text', 'zero', 'four')
-def test_reindent(text, zero, four):
-    assert timeit.reindent(text, 0) == zero
-    assert timeit.reindent(text, 4) == four
-
-
 # TIMEIT AND REPEAT FUNCTIONS
 
 
