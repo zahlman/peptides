@@ -297,7 +297,7 @@ _main_out_cases = (
     (
         'bad_switch', [], 1.0, ['--bad-switch'],
         'option --bad-switch not recognized\n' +
-        'use -h/--help for command line help\n', {}
+        'use -h/--help for command line help\n', {'verify': 'err'}
     ), (
         'seconds', [], 5.5, [],
         "1 loop, best of 5: 5.5 sec per loop\n", {}
