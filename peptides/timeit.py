@@ -208,11 +208,7 @@ class Timer:
         interested in.  After that, you should look at the entire
         vector and apply common sense rather than statistics.
         """
-        r = []
-        for i in range(repeat):
-            t = self.timeit(number)
-            r.append(t)
-        return r
+        return [self.timeit(number) for _ in range(repeat)]
 
 
     def autorange(self, callback=None):
