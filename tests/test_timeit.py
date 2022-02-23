@@ -170,8 +170,8 @@ def test_repeat_method(
 # AUTORANGE METHOD
 
 
-def _autorange_callback(a, b):
-    print("{} {:.3f}".format(a, b))
+def _autorange_callback(time, loops):
+    print(f"{loops} {time:.3f}")
 
 
 _autorange_text = (
@@ -207,7 +207,7 @@ def test_autorange(
 ):
     fake_timer.seconds_per_call = seconds_per_call
     t = timeit.Timer(stmt=fake_stmt, setup=fake_setup, timer=fake_timer)
-    actual_loops, actual_time = t.autorange(callback)
+    actual_time, actual_loops = t.autorange(callback)
     assert actual_loops == num_loops
     assert actual_time == time_taken
     result = capsys.readouterr()

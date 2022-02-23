@@ -221,17 +221,21 @@ class Timer:
         If *callback* is given and is not None, it will be called after
         each trial with two arguments: ``callback(number, time_taken)``.
         """
-        i = 1
-        while True:
-            for j in 1, 2, 5:
-                number = i * j
-                total_time, count = self.timeit(iterations=number, raw=True)
-                assert count == number
-                if callback:
-                    callback(number, total_time)
-                if total_time >= 0.2:
-                    return (number, total_time)
-            i *= 10
+        return self.repeat(autorange(0.2, callback), raw=True)[-1]
+
+
+def autorange(min_time, callback=None):
+    i = 1
+    while True:
+        for j in 1, 2, 5:
+            number = i * j
+            total_time, count = yield number
+            assert count == number
+            if callback:
+                callback(total_time, number)
+            if total_time >= min_time:
+                return
+        i *= 10
 
 
 def timeit(
@@ -308,7 +312,7 @@ def _parse_args(args):
     }
 
 
-def _autorange_callback(precision, number, time_taken):
+def _autorange_callback(precision, time_taken, number):
     msg = "{num} loop{s} -> {secs:.{prec}g} secs"
     plural = (number != 1)
     print(msg.format(num=number, s='s' if plural else '',
@@ -317,10 +321,10 @@ def _autorange_callback(precision, number, time_taken):
 
 def _auto_number(t, verbose, precision):
     callback = partial(_autorange_callback, precision) if verbose else None
-    result, _ = t.autorange(callback)
+    time, count = t.autorange(callback)
     if verbose:
         print()
-    return result
+    return count
 
 
 def format_time(precision, desired_name, dt):
