@@ -146,7 +146,7 @@ _repeat_cases = (
 
 
 @parametrize(
-    _timer_class_cases,
+    _repeat_cases,
     callable_stmt=False, callable_setup=False, trials=None, iterations=None
 )
 def test_repeat(fake_timer, callable_stmt, callable_setup, trials, iterations):
