@@ -161,7 +161,7 @@ class Timer:
         traceback.print_exc(file=file)
 
 
-    def timeit(self, *, raw=False, iterations=default_iterations):
+    def timeit(self, iterations=default_iterations, *, raw=False):
         """Time several executions of the main statement.
 
         To be precise, this executes the setup statement once, and
@@ -205,10 +205,9 @@ class Timer:
         interested in.  After that, you should look at the entire
         vector and apply common sense rather than statistics.
         """
-        return [
-            self.timeit(iterations=iterations, raw=raw)
-            for _ in range(trials)
-        ]
+        if isinstance(trials, int):
+            trials = itertools.repeat(iterations, trials)
+        return [self.timeit(trial, raw=raw) for trial in trials]
 
 
     def autorange(self, callback=None):
