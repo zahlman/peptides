@@ -185,7 +185,7 @@ class Timer:
 
     def repeat(
         self, trials=default_trials, *,
-        raw=False, iterations=default_iterations
+        raw=False, iterations=default_iterations, callback=None
     ):
         """Call timeit() a few times.
 
@@ -208,7 +208,10 @@ class Timer:
         """
         if isinstance(trials, int):
             trials = itertools.repeat(iterations, trials)
-        return list(feedback(trials, lambda t: self.timeit(t, raw=raw)))
+        results = feedback(trials, lambda t: self.timeit(t, raw=raw))
+        if callback is not None:
+            results = map(callback, results)
+        return list(results)
 
 
     def autorange(self, callback=None):
@@ -221,18 +224,16 @@ class Timer:
         If *callback* is given and is not None, it will be called after
         each trial with two arguments: ``callback(number, time_taken)``.
         """
-        return self.repeat(autorange(0.2, callback), raw=True)[-1]
+        return self.repeat(autorange(0.2), callback=callback, raw=True)[-1]
 
 
-def autorange(min_time, callback=None):
+def autorange(min_time):
     i = 1
     while True:
         for j in 1, 2, 5:
             number = i * j
             total_time, count = yield number
             assert count == number
-            if callback:
-                callback(total_time, number)
             if total_time >= min_time:
                 return
         i *= 10
@@ -312,11 +313,13 @@ def _parse_args(args):
     }
 
 
-def _autorange_callback(precision, time_taken, number):
+def _autorange_callback(precision, stats):
+    time_taken, number = stats
     msg = "{num} loop{s} -> {secs:.{prec}g} secs"
     plural = (number != 1)
     print(msg.format(num=number, s='s' if plural else '',
                       secs=time_taken, prec=precision))
+    return stats
 
 
 def _auto_number(t, verbose, precision):

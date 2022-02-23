@@ -170,8 +170,10 @@ def test_repeat_method(
 # AUTORANGE METHOD
 
 
-def _autorange_callback(time, loops):
+def _autorange_callback(stats):
+    time, loops = stats
     print(f"{loops} {time:.3f}")
+    return stats
 
 
 _autorange_text = (
