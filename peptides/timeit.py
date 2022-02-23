@@ -254,10 +254,9 @@ def _parse_args(args):
         args = sys.argv[1:]
     try:
         opts, args = getopt.getopt(
-            args, "n:u:s:r:tcpvh", [
-                "number=", "setup=", "repeat=",
-                "time", "clock", "process",
-                "verbose", "unit=", "help"
+            args, "n:u:s:r:pvh", [
+                "number=", "unit=", "setup=", "repeat=",
+                "process", "verbose", "help"
             ]
         )
     except getopt.error as err:
