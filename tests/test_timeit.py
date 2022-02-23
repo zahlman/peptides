@@ -137,7 +137,7 @@ _repeat_cases = (
         'raw_results', [], False, False,
         {'trials': 3, 'iterations': 5, 'raw': True}, {}
     ), (
-        'callable_stmt', [], True, False, 
+        'callable_stmt', [], True, False,
         {'trials': 3, 'iterations': 5}, {}
     ), (
         'callable_setup', [], False, True,
@@ -170,10 +170,9 @@ def test_repeat_method(
 # AUTORANGE METHOD
 
 
-def _autorange_callback(stats):
-    time, loops = stats
+def _autorange_callback(time, loops):
     print(f"{loops} {time:.3f}")
-    return stats
+    return time, loops
 
 
 _autorange_text = (

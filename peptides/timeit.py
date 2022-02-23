@@ -210,7 +210,7 @@ class Timer:
             trials = itertools.repeat(iterations, trials)
         results = feedback(trials, lambda t: self.timeit(t, raw=raw))
         if callback is not None:
-            results = map(callback, results)
+            results = (callback(*result) for result in results)
         return list(results)
 
 
@@ -313,13 +313,12 @@ def _parse_args(args):
     }
 
 
-def _autorange_callback(precision, stats):
-    time_taken, number = stats
+def _autorange_callback(precision, time_taken, number):
     msg = "{num} loop{s} -> {secs:.{prec}g} secs"
     plural = (number != 1)
     print(msg.format(num=number, s='s' if plural else '',
                       secs=time_taken, prec=precision))
-    return stats
+    return time_taken, number
 
 
 def _auto_number(t, verbose, precision):
