@@ -52,7 +52,8 @@ def assert_exc_string(exc_string, expected_exc_name):
     assert exc_lines[-1].startswith(expected_exc_name)
 
 
-def expected_time(expected_iterations, raw):
+def expected_time(expected_iterations, callback):
+    raw = (callback == 'raw')
     return (float(expected_iterations), expected_iterations) if raw else 1.0
 
 
@@ -97,9 +98,15 @@ def test_timer_args(stmt, setup, exc):
 
 _timeit_cases = (
     ('default_iters', [slow], False, False, {}, {}),
-    ('raw_zero_iters', [], False, False, {'iterations': 0, 'raw': True}, {}),
+    (
+        'raw_zero_iters', [], False, False,
+        {'iterations': 0, 'callback': 'raw'}, {}
+    ),
     ('few_iters', [], False, False, {'iterations': 3}, {}),
-    ('raw_results', [], False, False, {'iterations': 3, 'raw': True}, {}),
+    (
+        'raw_results', [], False, False,
+        {'iterations': 3, 'callback': 'raw'}, {}
+    ),
     ('callable_stmt', [], True, False, {'iterations': 3}, {}),
     ('callable_setup', [], False, True, {'iterations': 3}, {}),
     ('callable_stmt_and_setup', [], True, True, {'iterations': 3}, {})
@@ -119,8 +126,8 @@ def test_timeit_method(
     result = timer.timeit(**kwargs)
     assert fake_timer.setup_calls == 1
     assert fake_timer.count == expected_iterations
-    raw = kwargs.get('raw', False)
-    assert result == expected_time(expected_iterations, raw)
+    callback = kwargs.get('callback', None)
+    assert result == expected_time(expected_iterations, callback)
 
 
 # REPEAT METHOD
@@ -129,13 +136,15 @@ def test_timeit_method(
 _repeat_cases = (
     ('default', [slow], False, False, {}, {}), # about 3 seconds
     ('zero_reps', [], False, False, {'trials': 0}, {}),
-    ('raw_zero_iters', [], False, False, {'iterations': 0, 'raw': True}, {}),
     (
+        'raw_zero_iters', [], False, False,
+        {'iterations': 0, 'callback': 'raw'}, {}
+    ), (
         'few_reps_and_iters', [], False, False,
         {'trials': 3, 'iterations': 5}, {}
     ), (
         'raw_results', [], False, False,
-        {'trials': 3, 'iterations': 5, 'raw': True}, {}
+        {'trials': 3, 'iterations': 5, 'callback': 'raw'}, {}
     ), (
         'callable_stmt', [], True, False,
         {'trials': 3, 'iterations': 5}, {}
@@ -163,8 +172,8 @@ def test_repeat_method(
     result = t.repeat(**kwargs)
     assert fake_timer.setup_calls == trials
     assert fake_timer.count == trials * expected_iterations
-    raw = kwargs.get('raw', False)
-    assert result == trials * [expected_time(expected_iterations, raw)]
+    callback = kwargs.get('callback', None)
+    assert result == trials * [expected_time(expected_iterations, callback)]
 
 
 # AUTORANGE METHOD
@@ -200,7 +209,7 @@ _autorange_cases = (
 
 @parametrize(
     _autorange_cases, 'seconds_per_call', 'num_loops', 'time_taken',
-    callback=None, expected=''
+    callback='raw', expected=''
 )
 def test_autorange(
     capsys, fake_timer,
@@ -235,11 +244,11 @@ def test_print_exc(capsys):
 _timeit_and_repeat_cases = (
     # about 0.6 seconds
     (
-        'timeit_raw_default_iters', [slow], timeit.timeit, {'raw': True},
+        'timeit_raw_default_iters', [slow], timeit.timeit, {'callback': 'raw'},
         (DEFAULT_ITERATIONS, DEFAULT_ITERATIONS), {}
     ), (
         'timeit_raw_zero_iters', [], timeit.timeit,
-        {'iterations': 0, 'raw': True}, (0, 0), {}
+        {'iterations': 0, 'callback': 'raw'}, (0, 0), {}
     ), (
         'repeat_default', [slow], timeit.repeat, {}, # about 3 seconds
         DEFAULT_TRIALS * [1.0], {}
@@ -247,7 +256,7 @@ _timeit_and_repeat_cases = (
     ('repeat_zero_trials', [], timeit.repeat, {'trials': 0}, [], {}),
     (
         'repeat_raw_zero_iters', [], timeit.repeat,
-        {'iterations': 0, 'raw': True},
+        {'iterations': 0, 'callback': 'raw'},
         DEFAULT_TRIALS * [(0.0, 0)], {}
     )
 )

@@ -162,7 +162,7 @@ class Timer:
         traceback.print_exc(file=file)
 
 
-    def timeit(self, iterations=default_iterations, *, raw=False):
+    def timeit(self, iterations=default_iterations, *, callback=None):
         """Time several executions of the main statement.
 
         To be precise, this executes the setup statement once, and
@@ -180,12 +180,17 @@ class Timer:
         finally:
             if gcold:
                 gc.enable()
-        return (timing, iterations) if raw else timing / iterations
+        if callback is None:
+            return timing / iterations
+        elif callback == 'raw':
+            return (timing, iterations)
+        else:
+            return callback(timing, iterations)
 
 
     def repeat(
         self, trials=default_trials, *,
-        raw=False, iterations=default_iterations, callback=None
+        iterations=default_iterations, callback=None
     ):
         """Call timeit() a few times.
 
@@ -208,13 +213,12 @@ class Timer:
         """
         if isinstance(trials, int):
             trials = itertools.repeat(iterations, trials)
-        results = feedback(trials, lambda t: self.timeit(t, raw=raw))
-        if callback is not None:
-            results = (callback(*result) for result in results)
-        return list(results)
+        return list(
+            feedback(trials, lambda t: self.timeit(t, callback=callback))
+        )
 
 
-    def autorange(self, callback=None):
+    def autorange(self, callback='raw'):
         """Return the number of loops and time taken so that total time >= 0.2.
 
         Calls the timeit method with increasing numbers from the sequence
@@ -224,7 +228,7 @@ class Timer:
         If *callback* is given and is not None, it will be called after
         each trial with two arguments: ``callback(number, time_taken)``.
         """
-        return self.repeat(autorange(0.2), callback=callback, raw=True)[-1]
+        return self.repeat(autorange(0.2), callback=callback)[-1]
 
 
 def autorange(min_time):
@@ -241,20 +245,20 @@ def autorange(min_time):
 
 def timeit(
     stmt="pass", setup="pass", timer=default_timer, globals=None,
-    *, iterations=default_iterations, raw=False
+    *, iterations=default_iterations, callback=None
 ):
     """Convenience function to create Timer object and call timeit method."""
     t = Timer(stmt, setup, timer, globals)
-    return t.timeit(iterations=iterations, raw=raw)
+    return t.timeit(iterations=iterations, callback=callback)
 
 
 def repeat(
     stmt="pass", setup="pass", timer=default_timer, globals=None,
-    trials=default_trials, *, iterations=default_iterations, raw=False
+    trials=default_trials, *, iterations=default_iterations, callback=None
 ):
     """Convenience function to create Timer object and call repeat method."""
     t = Timer(stmt, setup, timer, globals)
-    return t.repeat(trials, iterations=iterations, raw=raw)
+    return t.repeat(trials, iterations=iterations, callback=callback)
 
 
 def _bailout(*messages):
@@ -320,7 +324,7 @@ def _autorange_callback(precision, time_taken, number):
 
 
 def _auto_number(t, verbose, precision):
-    callback = partial(_autorange_callback, precision) if verbose else None
+    callback = partial(_autorange_callback, precision) if verbose else 'raw'
     time, count = t.autorange(callback)
     if verbose:
         print()
@@ -360,7 +364,7 @@ def run(stmt, setup, timer, number, repeat, verbose, precision, unit_name):
     try:
         if number == 0:
             number = _auto_number(t, verbose, precision)
-        raw_timings = t.repeat(repeat, iterations=number, raw=True)
+        raw_timings = t.repeat(repeat, iterations=number, callback='raw')
     except:
         t.print_exc()
         return 1
