@@ -90,8 +90,9 @@ def test_timer_args(stmt, setup, exc):
 
 _timer_class_cases = (
     ('default_iters', [slow], {}),
-    ('zero_iters', [], {'iterations': 0}),
+    ('raw_zero_iters', [], {'iterations': 0, 'raw': True}),
     ('few_iters', [], {'iterations': 3}),
+    ('raw_results', [], {'iterations': 3, 'raw': True}),
     ('callable_stmt', [], {'callable_stmt': True, 'iterations': 3}),
     ('callable_setup', [], {'callable_setup': True, 'iterations': 3}),
     (
@@ -103,25 +104,29 @@ _timer_class_cases = (
 
 @parametrize(
     _timer_class_cases,
-    callable_stmt=False, callable_setup=False, iterations=None, globals=None
+    callable_stmt=False, callable_setup=False, globals=None,
+    iterations=None, raw=False
 )
 def test_timer_class(
-    fake_timer, callable_stmt, callable_setup, iterations, globals
+    fake_timer, callable_stmt, callable_setup, globals, iterations, raw
 ):
     stmt = fake_timer.inc if callable_stmt else fake_stmt
     setup = fake_timer.setup if callable_setup else fake_setup
     t = timeit.Timer(
         stmt=stmt, setup=setup, timer=fake_timer, globals=globals
     )
-    kwargs = {}
+    kwargs = {'raw': raw}
     if iterations is None:
         iterations = DEFAULT_ITERATIONS
     else:
         kwargs['iterations'] = iterations
-    delta_time = t.timeit(**kwargs)
+    result = t.timeit(**kwargs)
     assert fake_timer.setup_calls == 1
-    assert fake_timer.count == iterations 
-    assert delta_time == iterations
+    assert fake_timer.count == iterations
+    if raw:
+        assert result == (float(iterations), iterations)
+    else:
+        assert result == 1
 
 
 # REPEAT METHOD
@@ -130,8 +135,9 @@ def test_timer_class(
 _repeat_cases = (
     ('default', [slow], {}), # about 3 seconds
     ('zero_reps', [], {'trials': 0}),
-    ('zero_iters', [], {'iterations': 0}),
+    ('raw_zero_iters', [], {'iterations': 0, 'raw': True}),
     ('few_reps_and_iters', [], {'trials': 3, 'iterations': 5}),
+    ('raw_results', [], {'trials': 3, 'iterations': 5, 'raw': True}),
     ('callable_stmt', [], {
         'callable_stmt': True, 'trials': 3, 'iterations': 5
     }),
@@ -147,13 +153,16 @@ _repeat_cases = (
 
 @parametrize(
     _repeat_cases,
-    callable_stmt=False, callable_setup=False, trials=None, iterations=None
+    callable_stmt=False, callable_setup=False,
+    trials=None, iterations=None, raw=False
 )
-def test_repeat(fake_timer, callable_stmt, callable_setup, trials, iterations):
+def test_repeat(
+    fake_timer, callable_stmt, callable_setup, trials, iterations, raw
+):
     stmt = fake_timer.inc if callable_stmt else fake_stmt
     setup = fake_timer.setup if callable_setup else fake_setup
     t = timeit.Timer(stmt=stmt, setup=setup, timer=fake_timer)
-    kwargs = {}
+    kwargs = {'raw': raw}
     if trials is None:
         # Don't put it in kwargs, because we're testing the default values.
         trials = DEFAULT_TRIALS
@@ -164,10 +173,13 @@ def test_repeat(fake_timer, callable_stmt, callable_setup, trials, iterations):
         iterations = DEFAULT_ITERATIONS
     else:
         kwargs['iterations'] = iterations
-    delta_times = t.repeat(**kwargs)
+    result = t.repeat(**kwargs)
     assert fake_timer.setup_calls == trials
     assert fake_timer.count == trials * iterations
-    assert delta_times == trials * [float(iterations)]
+    if raw:
+        assert result == trials * [(float(iterations), iterations)]
+    else:
+        assert result == trials * [1.0]
 
 
 # AUTORANGE METHOD
@@ -236,16 +248,21 @@ def test_print_exc(capsys):
 
 _timeit_and_repeat_cases = (
     # about 0.6 seconds
-    ('timeit_default_iters', [slow], timeit.timeit, {}, DEFAULT_ITERATIONS, {}),
-    ('timeit_zero_iters', [], timeit.timeit, {'iterations': 0}, 0, {}),
     (
-        'default', [slow], timeit.repeat, {}, # about 3 seconds
-        DEFAULT_TRIALS * [float(DEFAULT_ITERATIONS)], {}
+        'timeit_raw_default_iters', [slow], timeit.timeit, {'raw': True},
+        (DEFAULT_ITERATIONS, DEFAULT_ITERATIONS), {}
+    ), (
+        'timeit_raw_zero_iters', [], timeit.timeit,
+        {'iterations': 0, 'raw': True}, (0, 0), {}
+    ), (
+        'repeat_default', [slow], timeit.repeat, {}, # about 3 seconds
+        DEFAULT_TRIALS * [1.0], {}
     ),
-    ('zero_trials', [], timeit.repeat, {'trials': 0}, [], {}),
+    ('repeat_zero_trials', [], timeit.repeat, {'trials': 0}, [], {}),
     (
-        'zero_iters', [], timeit.repeat, {'iterations': 0},
-        DEFAULT_TRIALS * [0.0], {}
+        'repeat_raw_zero_iters', [], timeit.repeat,
+        {'iterations': 0, 'raw': True},
+        DEFAULT_TRIALS * [(0.0, 0)], {}
     )
 )
 

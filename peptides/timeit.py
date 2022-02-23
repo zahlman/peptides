@@ -161,8 +161,8 @@ class Timer:
         traceback.print_exc(file=file)
 
 
-    def timeit(self, *, iterations=default_iterations):
-        """Time 'number' executions of the main statement.
+    def timeit(self, *, raw=False, iterations=default_iterations):
+        """Time several executions of the main statement.
 
         To be precise, this executes the setup statement once, and
         then returns the time it takes to execute the main statement
@@ -179,10 +179,13 @@ class Timer:
         finally:
             if gcold:
                 gc.enable()
-        return timing
+        return (timing, iterations) if raw else timing / iterations
 
 
-    def repeat(self, trials=default_trials, *, iterations=default_iterations):
+    def repeat(
+        self, trials=default_trials, *,
+        raw=False, iterations=default_iterations
+    ):
         """Call timeit() a few times.
 
         This is a convenience function that calls the timeit()
@@ -202,7 +205,10 @@ class Timer:
         interested in.  After that, you should look at the entire
         vector and apply common sense rather than statistics.
         """
-        return [self.timeit(iterations=iterations) for _ in range(trials)]
+        return [
+            self.timeit(iterations=iterations, raw=raw)
+            for _ in range(trials)
+        ]
 
 
     def autorange(self, callback=None):
@@ -219,29 +225,31 @@ class Timer:
         while True:
             for j in 1, 2, 5:
                 number = i * j
-                time_taken = self.timeit(iterations=number)
+                total_time, count = self.timeit(iterations=number, raw=True)
+                assert count == number
                 if callback:
-                    callback(number, time_taken)
-                if time_taken >= 0.2:
-                    return (number, time_taken)
+                    callback(number, total_time)
+                if total_time >= 0.2:
+                    return (number, total_time)
             i *= 10
 
 
 def timeit(
     stmt="pass", setup="pass", timer=default_timer, globals=None,
-    *, iterations=default_iterations
+    *, iterations=default_iterations, raw=False
 ):
     """Convenience function to create Timer object and call timeit method."""
-    return Timer(stmt, setup, timer, globals).timeit(iterations=iterations)
+    t = Timer(stmt, setup, timer, globals)
+    return t.timeit(iterations=iterations, raw=raw)
 
 
 def repeat(
     stmt="pass", setup="pass", timer=default_timer, globals=None,
-    trials=default_trials, *, iterations=default_iterations
+    trials=default_trials, *, iterations=default_iterations, raw=False
 ):
     """Convenience function to create Timer object and call repeat method."""
     t = Timer(stmt, setup, timer, globals)
-    return t.repeat(trials, iterations=iterations)
+    return t.repeat(trials, iterations=iterations, raw=raw)
 
 
 def _bailout(*messages):
@@ -326,9 +334,9 @@ def format_time(precision, desired_name, dt):
 def print_stats(number, repeat, raw_timings, verbose, precision, unit_name):
     if verbose:
         print("raw times:", ", ".join(
-            format_time(precision, unit_name, dt) for dt in raw_timings
+            format_time(precision, unit_name, dt[0]) for dt in raw_timings
         ), end='\n\n')
-    timings = [dt / number for dt in raw_timings]
+    timings = [dt / count for dt, count in raw_timings]
     best, worst = min(timings), max(timings)
     formatted_best = format_time(precision, unit_name, best)
     formatted_worst = format_time(precision, unit_name, worst)
@@ -348,7 +356,7 @@ def run(stmt, setup, timer, number, repeat, verbose, precision, unit_name):
     try:
         if number == 0:
             number = _auto_number(t, verbose, precision)
-        raw_timings = t.repeat(repeat, iterations=number)
+        raw_timings = t.repeat(repeat, iterations=number, raw=True)
     except:
         t.print_exc()
         return 1
