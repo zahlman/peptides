@@ -314,10 +314,8 @@ def _parse_args(args):
 
 
 def _autorange_callback(precision, time_taken, number):
-    msg = "{num} loop{s} -> {secs:.{prec}g} secs"
-    plural = (number != 1)
-    print(msg.format(num=number, s='s' if plural else '',
-                      secs=time_taken, prec=precision))
+    s = '' if (number == 1) else 's'
+    print(f"{number} loop{s} -> {time_taken:.{precision}g} secs")
     return time_taken, number
 
 
