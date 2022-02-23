@@ -52,7 +52,11 @@ def assert_exc_string(exc_string, expected_exc_name):
     assert exc_lines[-1].startswith(expected_exc_name)
 
 
-# TIMER CLASS
+def expected_time(expected_iterations, raw):
+    return (float(expected_iterations), expected_iterations) if raw else 1.0
+
+
+# TIMER CLASS CREATION
 
 
 _timer_args_cases = (
@@ -88,98 +92,79 @@ def test_timer_args(stmt, setup, exc):
         timeit.Timer(stmt=stmt, setup=setup)
 
 
-_timer_class_cases = (
-    ('default_iters', [slow], {}),
-    ('raw_zero_iters', [], {'iterations': 0, 'raw': True}),
-    ('few_iters', [], {'iterations': 3}),
-    ('raw_results', [], {'iterations': 3, 'raw': True}),
-    ('callable_stmt', [], {'callable_stmt': True, 'iterations': 3}),
-    ('callable_setup', [], {'callable_setup': True, 'iterations': 3}),
-    (
-        'callable_stmt_and_setup', [],
-        {'callable_stmt': True, 'callable_setup': True, 'iterations': 3}
-    )
+# TIMEIT METHOD
+
+
+_timeit_cases = (
+    ('default_iters', [slow], False, False, {}, {}),
+    ('raw_zero_iters', [], False, False, {'iterations': 0, 'raw': True}, {}),
+    ('few_iters', [], False, False, {'iterations': 3}, {}),
+    ('raw_results', [], False, False, {'iterations': 3, 'raw': True}, {}),
+    ('callable_stmt', [], True, False, {'iterations': 3}, {}),
+    ('callable_setup', [], False, True, {'iterations': 3}, {}),
+    ('callable_stmt_and_setup', [], True, True, {'iterations': 3}, {})
 )
 
 
 @parametrize(
-    _timer_class_cases,
-    callable_stmt=False, callable_setup=False, globals=None,
-    iterations=None, raw=False
+    _timeit_cases, 'callable_stmt', 'callable_setup', 'kwargs', globals=None
 )
-def test_timer_class(
-    fake_timer, callable_stmt, callable_setup, globals, iterations, raw
+def test_timeit_method(
+    fake_timer, callable_stmt, callable_setup, kwargs, globals
 ):
     stmt = fake_timer.inc if callable_stmt else fake_stmt
     setup = fake_timer.setup if callable_setup else fake_setup
-    t = timeit.Timer(
-        stmt=stmt, setup=setup, timer=fake_timer, globals=globals
-    )
-    kwargs = {'raw': raw}
-    if iterations is None:
-        iterations = DEFAULT_ITERATIONS
-    else:
-        kwargs['iterations'] = iterations
-    result = t.timeit(**kwargs)
+    expected_iterations = kwargs.get('iterations', DEFAULT_ITERATIONS)
+    timer = timeit.Timer(stmt, setup, fake_timer, globals)
+    result = timer.timeit(**kwargs)
     assert fake_timer.setup_calls == 1
-    assert fake_timer.count == iterations
-    if raw:
-        assert result == (float(iterations), iterations)
-    else:
-        assert result == 1
+    assert fake_timer.count == expected_iterations
+    raw = kwargs.get('raw', False)
+    assert result == expected_time(expected_iterations, raw)
 
 
 # REPEAT METHOD
 
 
 _repeat_cases = (
-    ('default', [slow], {}), # about 3 seconds
-    ('zero_reps', [], {'trials': 0}),
-    ('raw_zero_iters', [], {'iterations': 0, 'raw': True}),
-    ('few_reps_and_iters', [], {'trials': 3, 'iterations': 5}),
-    ('raw_results', [], {'trials': 3, 'iterations': 5, 'raw': True}),
-    ('callable_stmt', [], {
-        'callable_stmt': True, 'trials': 3, 'iterations': 5
-    }),
-    ('callable_setup', [], {
-        'callable_setup': True, 'trials': 3, 'iterations': 5}
-    ),
-    ('callable_stmt_and_setup', [], {
-        'callable_setup': True, 'callable_stmt': True,
-        'trials': 3, 'iterations': 5
-    })
+    ('default', [slow], False, False, {}, {}), # about 3 seconds
+    ('zero_reps', [], False, False, {'trials': 0}, {}),
+    ('raw_zero_iters', [], False, False, {'iterations': 0, 'raw': True}, {}),
+    (
+        'few_reps_and_iters', [], False, False,
+        {'trials': 3, 'iterations': 5}, {}
+    ), (
+        'raw_results', [], False, False,
+        {'trials': 3, 'iterations': 5, 'raw': True}, {}
+    ), (
+        'callable_stmt', [], True, False, 
+        {'trials': 3, 'iterations': 5}, {}
+    ), (
+        'callable_setup', [], False, True,
+        {'trials': 3, 'iterations': 5}, {}
+    ), (
+        'callable_stmt_and_setup', [], True, True,
+        {'trials': 3, 'iterations': 5}, {}
+    )
 )
 
 
 @parametrize(
-    _repeat_cases,
-    callable_stmt=False, callable_setup=False,
-    trials=None, iterations=None, raw=False
+    _repeat_cases, 'callable_stmt', 'callable_setup', 'kwargs', globals=None
 )
-def test_repeat(
-    fake_timer, callable_stmt, callable_setup, trials, iterations, raw
+def test_repeat_method(
+    fake_timer, callable_stmt, callable_setup, kwargs, globals
 ):
     stmt = fake_timer.inc if callable_stmt else fake_stmt
     setup = fake_timer.setup if callable_setup else fake_setup
-    t = timeit.Timer(stmt=stmt, setup=setup, timer=fake_timer)
-    kwargs = {'raw': raw}
-    if trials is None:
-        # Don't put it in kwargs, because we're testing the default values.
-        trials = DEFAULT_TRIALS
-    else:
-        kwargs['trials'] = trials
-    if iterations is None:
-        # Don't put it in kwargs, because we're testing the default values.
-        iterations = DEFAULT_ITERATIONS
-    else:
-        kwargs['iterations'] = iterations
+    expected_iterations = kwargs.get('iterations', DEFAULT_ITERATIONS)
+    trials = kwargs.get('trials', DEFAULT_TRIALS)
+    t = timeit.Timer(stmt, setup, fake_timer, globals)
     result = t.repeat(**kwargs)
     assert fake_timer.setup_calls == trials
-    assert fake_timer.count == trials * iterations
-    if raw:
-        assert result == trials * [(float(iterations), iterations)]
-    else:
-        assert result == trials * [1.0]
+    assert fake_timer.count == trials * expected_iterations
+    raw = kwargs.get('raw', False)
+    assert result == trials * [expected_time(expected_iterations, raw)]
 
 
 # AUTORANGE METHOD
