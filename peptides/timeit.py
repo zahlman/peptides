@@ -46,6 +46,7 @@ Functions:
 
 import gc, getopt, itertools, linecache, os, sys, time, traceback, warnings
 from functools import partial
+from .generator_feedback import feedback
 
 
 __all__ = ["Timer", "timeit", "repeat", "default_timer"]
@@ -207,7 +208,7 @@ class Timer:
         """
         if isinstance(trials, int):
             trials = itertools.repeat(iterations, trials)
-        return [self.timeit(trial, raw=raw) for trial in trials]
+        return list(feedback(trials, lambda t: self.timeit(t, raw=raw)))
 
 
     def autorange(self, callback=None):
