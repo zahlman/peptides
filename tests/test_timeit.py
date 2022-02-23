@@ -10,7 +10,8 @@ from .infrastructure import parametrize, raises
 from peptides import timeit # test our version, not the standard library
 
 
-DEFAULT_NUMBER, DEFAULT_REPEAT = timeit.default_number, timeit.default_repeat
+DEFAULT_ITERATIONS = timeit.default_iterations
+DEFAULT_TRIALS = timeit.default_trials
 fake_setup = "from peptides import timeit\ntimeit._fake_timer.setup()"
 fake_stmt = "from peptides import timeit\ntimeit._fake_timer.inc()"
 
@@ -89,23 +90,23 @@ def test_timer_args(stmt, setup, exc):
 
 _timer_class_cases = (
     ('default_iters', [slow], {}),
-    ('zero_iters', [], {'number': 0}),
-    ('few_iters', [], {'number': 3}),
-    ('callable_stmt', [], {'callable_stmt': True, 'number': 3}),
-    ('callable_setup', [], {'callable_setup': True, 'number': 3}),
+    ('zero_iters', [], {'iterations': 0}),
+    ('few_iters', [], {'iterations': 3}),
+    ('callable_stmt', [], {'callable_stmt': True, 'iterations': 3}),
+    ('callable_setup', [], {'callable_setup': True, 'iterations': 3}),
     (
         'callable_stmt_and_setup', [],
-        {'callable_stmt': True, 'callable_setup': True, 'number': 3}
+        {'callable_stmt': True, 'callable_setup': True, 'iterations': 3}
     )
 )
 
 
 @parametrize(
     _timer_class_cases,
-    callable_stmt=False, callable_setup=False, number=None, globals=None
+    callable_stmt=False, callable_setup=False, iterations=None, globals=None
 )
 def test_timer_class(
-    fake_timer, callable_stmt, callable_setup, number, globals
+    fake_timer, callable_stmt, callable_setup, iterations, globals
 ):
     stmt = fake_timer.inc if callable_stmt else fake_stmt
     setup = fake_timer.setup if callable_setup else fake_setup
@@ -113,14 +114,14 @@ def test_timer_class(
         stmt=stmt, setup=setup, timer=fake_timer, globals=globals
     )
     kwargs = {}
-    if number is None:
-        number = DEFAULT_NUMBER
+    if iterations is None:
+        iterations = DEFAULT_ITERATIONS
     else:
-        kwargs['number'] = number
+        kwargs['iterations'] = iterations
     delta_time = t.timeit(**kwargs)
     assert fake_timer.setup_calls == 1
-    assert fake_timer.count == number
-    assert delta_time == number
+    assert fake_timer.count == iterations 
+    assert delta_time == iterations
 
 
 # REPEAT METHOD
@@ -128,41 +129,45 @@ def test_timer_class(
 
 _repeat_cases = (
     ('default', [slow], {}), # about 3 seconds
-    ('zero_reps', [], {'repeat': 0}),
-    ('zero_iters', [], {'number': 0}),
-    ('few_reps_and_iters', [], {'repeat': 3, 'number': 5}),
-    ('callable_stmt', [], {'callable_stmt': True, 'repeat': 3, 'number': 5}),
-    ('callable_setup', [], {'callable_setup': True, 'repeat': 3, 'number': 5}),
+    ('zero_reps', [], {'trials': 0}),
+    ('zero_iters', [], {'iterations': 0}),
+    ('few_reps_and_iters', [], {'trials': 3, 'iterations': 5}),
+    ('callable_stmt', [], {
+        'callable_stmt': True, 'trials': 3, 'iterations': 5
+    }),
+    ('callable_setup', [], {
+        'callable_setup': True, 'trials': 3, 'iterations': 5}
+    ),
     ('callable_stmt_and_setup', [], {
         'callable_setup': True, 'callable_stmt': True,
-        'repeat': 3, 'number': 5
+        'trials': 3, 'iterations': 5
     })
 )
 
 
 @parametrize(
     _timer_class_cases,
-    callable_stmt=False, callable_setup=False, repeat=None, number=None
+    callable_stmt=False, callable_setup=False, trials=None, iterations=None
 )
-def test_repeat(fake_timer, callable_stmt, callable_setup, repeat, number):
+def test_repeat(fake_timer, callable_stmt, callable_setup, trials, iterations):
     stmt = fake_timer.inc if callable_stmt else fake_stmt
     setup = fake_timer.setup if callable_setup else fake_setup
     t = timeit.Timer(stmt=stmt, setup=setup, timer=fake_timer)
     kwargs = {}
-    if repeat is None:
+    if trials is None:
         # Don't put it in kwargs, because we're testing the default values.
-        repeat = DEFAULT_REPEAT
+        trials = DEFAULT_TRIALS
     else:
-        kwargs['repeat'] = repeat
-    if number is None:
+        kwargs['trials'] = trials
+    if iterations is None:
         # Don't put it in kwargs, because we're testing the default values.
-        number = DEFAULT_NUMBER
+        iterations = DEFAULT_ITERATIONS
     else:
-        kwargs['number'] = number
+        kwargs['iterations'] = iterations
     delta_times = t.repeat(**kwargs)
-    assert fake_timer.setup_calls == repeat
-    assert fake_timer.count == repeat * number
-    assert delta_times == repeat * [float(number)]
+    assert fake_timer.setup_calls == trials
+    assert fake_timer.count == trials * iterations
+    assert delta_times == trials * [float(iterations)]
 
 
 # AUTORANGE METHOD
@@ -231,14 +236,17 @@ def test_print_exc(capsys):
 
 _timeit_and_repeat_cases = (
     # about 0.6 seconds
-    ('timeit_default_iters', [slow], timeit.timeit, {}, DEFAULT_NUMBER, {}),
-    ('timeit_zero_iters', [], timeit.timeit, {'number': 0}, 0, {}),
+    ('timeit_default_iters', [slow], timeit.timeit, {}, DEFAULT_ITERATIONS, {}),
+    ('timeit_zero_iters', [], timeit.timeit, {'iterations': 0}, 0, {}),
     (
         'default', [slow], timeit.repeat, {}, # about 3 seconds
-        DEFAULT_REPEAT * [float(DEFAULT_NUMBER)], {}
+        DEFAULT_TRIALS * [float(DEFAULT_ITERATIONS)], {}
     ),
-    ('zero_reps', [], timeit.repeat, {'repeat': 0}, [], {}),
-    ('zero_iters', [], timeit.repeat, {'number': 0}, DEFAULT_REPEAT * [0.0], {})
+    ('zero_trials', [], timeit.repeat, {'trials': 0}, [], {}),
+    (
+        'zero_iters', [], timeit.repeat, {'iterations': 0},
+        DEFAULT_TRIALS * [0.0], {}
+    )
 )
 
 
@@ -258,15 +266,15 @@ def test_timeit_globals_args():
     _global_timer = FakeTimer()
     t = timeit.Timer(stmt='_global_timer.inc()', timer=_global_timer)
     with raises(NameError):
-        t.timeit(number=3)
+        t.timeit(iterations=3)
     timeit.timeit(
         stmt='_global_timer.inc()', timer=_global_timer,
-        globals=globals(), number=3
+        globals=globals(), iterations=3
     )
     local_timer = FakeTimer()
     timeit.timeit(
         stmt='local_timer.inc()', timer=local_timer,
-        globals=locals(), number=3
+        globals=locals(), iterations=3
     )
 
 
@@ -292,12 +300,12 @@ _main_out_cases = (
         "35 loops, best of 5: 2 sec per loop\n", {}
     ), (
         'setup', [], 2.0, ['-n35', '-s', 'print("CustomSetup")'],
-        "CustomSetup\n" * DEFAULT_REPEAT +
+        "CustomSetup\n" * DEFAULT_TRIALS +
         "35 loops, best of 5: 2 sec per loop\n", {}
     ), (
         'multiple_setups', [],
         2.0, ['-n35', '-s', 'a = "CustomSetup"', '-s', 'print(a)'],
-        "CustomSetup\n" * DEFAULT_REPEAT +
+        "CustomSetup\n" * DEFAULT_TRIALS +
         "35 loops, best of 5: 2 sec per loop\n", {}
     ), (
         'fixed_reps', [], 60.0, ['-r9'],

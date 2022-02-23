@@ -52,8 +52,8 @@ __all__ = ["Timer", "timeit", "repeat", "default_timer"]
 
 
 dummy_src_name = "<timeit-src>"
-default_number = 1000000
-default_repeat = 5
+default_iterations = 1000000
+default_trials = 5
 default_timer = time.perf_counter
 
 
@@ -161,7 +161,7 @@ class Timer:
         traceback.print_exc(file=file)
 
 
-    def timeit(self, number=default_number):
+    def timeit(self, *, iterations=default_iterations):
         """Time 'number' executions of the main statement.
 
         To be precise, this executes the setup statement once, and
@@ -171,7 +171,7 @@ class Timer:
         to one million.  The main statement, the setup statement and
         the timer function to be used are passed to the constructor.
         """
-        it = itertools.repeat(None, number)
+        it = itertools.repeat(None, iterations)
         gcold = gc.isenabled()
         gc.disable()
         try:
@@ -182,7 +182,7 @@ class Timer:
         return timing
 
 
-    def repeat(self, repeat=default_repeat, number=default_number):
+    def repeat(self, trials=default_trials, *, iterations=default_iterations):
         """Call timeit() a few times.
 
         This is a convenience function that calls the timeit()
@@ -202,7 +202,7 @@ class Timer:
         interested in.  After that, you should look at the entire
         vector and apply common sense rather than statistics.
         """
-        return [self.timeit(number) for _ in range(repeat)]
+        return [self.timeit(iterations=iterations) for _ in range(trials)]
 
 
     def autorange(self, callback=None):
@@ -219,7 +219,7 @@ class Timer:
         while True:
             for j in 1, 2, 5:
                 number = i * j
-                time_taken = self.timeit(number)
+                time_taken = self.timeit(iterations=number)
                 if callback:
                     callback(number, time_taken)
                 if time_taken >= 0.2:
@@ -228,19 +228,20 @@ class Timer:
 
 
 def timeit(
-    stmt="pass", setup="pass", timer=default_timer,
-    number=default_number, globals=None
+    stmt="pass", setup="pass", timer=default_timer, globals=None,
+    *, iterations=default_iterations
 ):
     """Convenience function to create Timer object and call timeit method."""
-    return Timer(stmt, setup, timer, globals).timeit(number)
+    return Timer(stmt, setup, timer, globals).timeit(iterations=iterations)
 
 
 def repeat(
-    stmt="pass", setup="pass", timer=default_timer,
-    repeat=default_repeat, number=default_number, globals=None
+    stmt="pass", setup="pass", timer=default_timer, globals=None,
+    trials=default_trials, *, iterations=default_iterations
 ):
     """Convenience function to create Timer object and call repeat method."""
-    return Timer(stmt, setup, timer, globals).repeat(repeat, number)
+    t = Timer(stmt, setup, timer, globals)
+    return t.repeat(trials, iterations=iterations)
 
 
 def _bailout(*messages):
@@ -265,7 +266,7 @@ def _parse_args(args):
     timer = default_timer
     number = 0 # auto-determine
     setup = []
-    repeat = default_repeat
+    repeat = default_trials
     verbose = 0
     unit_name = None
     precision = 3
@@ -348,7 +349,7 @@ def run(stmt, setup, timer, number, repeat, verbose, precision, unit_name):
     try:
         if number == 0:
             number = _auto_number(t, verbose, precision)
-        raw_timings = t.repeat(repeat, number)
+        raw_timings = t.repeat(repeat, iterations=number)
     except:
         t.print_exc()
         return 1
