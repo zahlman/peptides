@@ -187,7 +187,7 @@ def test_repeat_method(
     assert result == trials * [expected_time(expected_iterations, callback)]
 
 
-# AUTORANGE METHOD
+# AUTORANGE
 
 
 def _autorange_callback(time, loops):
@@ -228,9 +228,11 @@ def test_autorange(
 ):
     fake_timer.seconds_per_call = seconds_per_call
     t = timeit.Timer(stmt=fake_stmt, setup=fake_setup, timer=fake_timer)
-    actual_time, actual_loops = t.autorange(callback)
-    assert actual_loops == num_loops
-    assert actual_time == time_taken
+    results = t.repeat(timeit.autorange(0.2), callback=callback)
+    if callback == 'raw':
+        actual_time, actual_loops = results[-1]
+        assert actual_time == time_taken
+        assert actual_loops == num_loops
     result = capsys.readouterr()
     out, err = result.out, result.err
     assert out == expected

@@ -218,19 +218,6 @@ class Timer:
         )
 
 
-    def autorange(self, callback='raw'):
-        """Return the number of loops and time taken so that total time >= 0.2.
-
-        Calls the timeit method with increasing numbers from the sequence
-        1, 2, 5, 10, 20, 50, ... until the time taken is at least 0.2
-        second.  Returns (number, time_taken).
-
-        If *callback* is given and is not None, it will be called after
-        each trial with two arguments: ``callback(number, time_taken)``.
-        """
-        return self.repeat(autorange(0.2), callback=callback)[-1]
-
-
 def autorange(min_time):
     i = 1
     while True:
@@ -317,15 +304,16 @@ def _parse_args(args):
     }
 
 
-def _autorange_callback(precision, time_taken, number):
-    s = '' if (number == 1) else 's'
-    print(f"{number} loop{s} -> {time_taken:.{precision}g} secs")
+def _autorange_callback(verbose, precision, time_taken, number):
+    if verbose:
+        s = '' if (number == 1) else 's'
+        print(f"{number} loop{s} -> {time_taken:.{precision}g} secs")
     return time_taken, number
 
 
 def _auto_number(t, verbose, precision):
-    callback = partial(_autorange_callback, precision) if verbose else 'raw'
-    time, count = t.autorange(callback)
+    callback = partial(_autorange_callback, verbose, precision)
+    count = t.repeat(autorange(0.2), callback=callback)[-1][1]
     if verbose:
         print()
     return count
