@@ -53,8 +53,7 @@ __all__ = ["Timer", "timeit", "repeat", "default_timer"]
 
 
 dummy_src_name = "<timeit-src>"
-default_iterations = 1000000
-default_trials = 5
+_default_trials = 5 # used for CLI and testing, not programmatically
 default_timer = time.perf_counter
 
 
@@ -162,7 +161,7 @@ class Timer:
         traceback.print_exc(file=file)
 
 
-    def timeit(self, iterations=default_iterations, *, callback=None):
+    def timeit(self, iterations, *, callback=None):
         """Time several executions of the main statement.
 
         To be precise, this executes the setup statement once, and
@@ -188,10 +187,7 @@ class Timer:
             return callback(timing, iterations)
 
 
-    def repeat(
-        self, trials=default_trials, *,
-        iterations=default_iterations, callback=None
-    ):
+    def repeat(self, trials, *, iterations=None, callback=None):
         """Call timeit() a few times.
 
         This is a convenience function that calls the timeit()
@@ -212,6 +208,10 @@ class Timer:
         vector and apply common sense rather than statistics.
         """
         if isinstance(trials, int):
+            if iterations is None:
+                raise ValueError('iterations must be given with integer trials')
+            if not isinstance(iterations, int):
+                raise TypeError('iteration count must be integer')
             trials = itertools.repeat(iterations, trials)
         return list(
             feedback(trials, lambda t: self.timeit(t, callback=callback))
@@ -231,17 +231,19 @@ def autorange(min_time):
 
 
 def timeit(
+    iterations, *,
     stmt="pass", setup="pass", timer=default_timer, globals=None,
-    *, iterations=default_iterations, callback=None
+    callback=None
 ):
     """Convenience function to create Timer object and call timeit method."""
     t = Timer(stmt, setup, timer, globals)
-    return t.timeit(iterations=iterations, callback=callback)
+    return t.timeit(iterations, callback=callback)
 
 
 def repeat(
+    trials, *,
     stmt="pass", setup="pass", timer=default_timer, globals=None,
-    trials=default_trials, *, iterations=default_iterations, callback=None
+    iterations=None, callback=None
 ):
     """Convenience function to create Timer object and call repeat method."""
     t = Timer(stmt, setup, timer, globals)
@@ -269,7 +271,7 @@ def _parse_args(args):
     timer = default_timer
     number = 0 # auto-determine
     setup = []
-    repeat = default_trials
+    repeat = _default_trials
     verbose = 0
     unit_name = None
     precision = 3

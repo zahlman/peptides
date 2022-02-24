@@ -10,8 +10,7 @@ from .infrastructure import parametrize, raises
 from peptides import timeit # test our version, not the standard library
 
 
-DEFAULT_ITERATIONS = timeit.default_iterations
-DEFAULT_TRIALS = timeit.default_trials
+DEFAULT_TRIALS = timeit._default_trials
 fake_setup = "from peptides import timeit\ntimeit._fake_timer.setup()"
 fake_stmt = "from peptides import timeit\ntimeit._fake_timer.inc()"
 
@@ -97,19 +96,12 @@ def test_timer_args(stmt, setup, exc):
 
 
 _timeit_cases = (
-    ('default_iters', [slow], False, False, {}, {}),
-    (
-        'raw_zero_iters', [], False, False,
-        {'iterations': 0, 'callback': 'raw'}, {}
-    ),
-    ('few_iters', [], False, False, {'iterations': 3}, {}),
-    (
-        'raw_results', [], False, False,
-        {'iterations': 3, 'callback': 'raw'}, {}
-    ),
-    ('callable_stmt', [], True, False, {'iterations': 3}, {}),
-    ('callable_setup', [], False, True, {'iterations': 3}, {}),
-    ('callable_stmt_and_setup', [], True, True, {'iterations': 3}, {})
+    ('raw_zero_iters', [], 0, False, False, {'callback': 'raw'}, {}),
+    ('few_iters', [], 3, False, False, {}, {}),
+    ('raw_results', [], 3, False, False, {'callback': 'raw'}, {}),
+    ('callable_stmt', [], 3, True, False, {}, {}),
+    ('callable_setup', [], 3, False, True, {}, {}),
+    ('callable_stmt_and_setup', [], 3, True, True, {}, {})
 )
 
 
@@ -118,73 +110,79 @@ _method_options = (('method', [], False, {}), ('function', [], True, {}))
 
 @parametrize(_method_options, 'use_function')
 @parametrize(
-    _timeit_cases, 'callable_stmt', 'callable_setup', 'kwargs', globals=None
+    _timeit_cases, 'iterations', 'callable_stmt', 'callable_setup', 'kwargs'
 )
 def test_timeit_method(
-    fake_timer, callable_stmt, callable_setup, kwargs, globals, use_function
+    fake_timer,
+    iterations, callable_stmt, callable_setup, kwargs,
+    use_function
 ):
     stmt = fake_timer.inc if callable_stmt else fake_stmt
     setup = fake_timer.setup if callable_setup else fake_setup
-    expected_iterations = kwargs.get('iterations', DEFAULT_ITERATIONS)
     if use_function:
-        result = timeit.timeit(stmt, setup, fake_timer, globals, **kwargs)
+        result = timeit.timeit(
+            iterations,
+            stmt=stmt, setup=setup, timer=fake_timer, globals=None, **kwargs
+        )
     else:
-        timer = timeit.Timer(stmt, setup, fake_timer, globals)
-        result = timer.timeit(**kwargs)
+        timer = timeit.Timer(stmt, setup, fake_timer, None)
+        result = timer.timeit(iterations, **kwargs)
     assert fake_timer.setup_calls == 1
-    assert fake_timer.count == expected_iterations
+    assert fake_timer.count == iterations
     callback = kwargs.get('callback', None)
-    assert result == expected_time(expected_iterations, callback)
+    assert result == expected_time(iterations, callback)
 
 
 # REPEAT METHOD (AND FUNCTION)
 
 
-_repeat_cases = (
-    ('default', [slow], False, False, {}, {}), # about 3 seconds
-    ('zero_reps', [], False, False, {'trials': 0}, {}),
-    (
-        'raw_zero_iters', [], False, False,
-        {'iterations': 0, 'callback': 'raw'}, {}
-    ), (
-        'few_reps_and_iters', [], False, False,
-        {'trials': 3, 'iterations': 5}, {}
-    ), (
-        'raw_results', [], False, False,
-        {'trials': 3, 'iterations': 5, 'callback': 'raw'}, {}
-    ), (
-        'callable_stmt', [], True, False,
-        {'trials': 3, 'iterations': 5}, {}
-    ), (
-        'callable_setup', [], False, True,
-        {'trials': 3, 'iterations': 5}, {}
-    ), (
-        'callable_stmt_and_setup', [], True, True,
-        {'trials': 3, 'iterations': 5}, {}
-    )
+def _do_repeat_method_test(
+    stmt, setup, timer, trials, use_function, kwargs,
+    last_iterations, total_iterations, raw
+):
+    if use_function:
+        result = timeit.repeat(
+            trials, stmt=stmt, setup=setup, timer=timer, **kwargs
+        )
+    else:
+        t = timeit.Timer(stmt, setup, timer, None)
+        result = t.repeat(trials, **kwargs)
+    assert timer.setup_calls == trials
+    assert timer.count == total_iterations
+    expected_result = (float(last_iterations), last_iterations) if raw else 1.0
+    assert result == trials * [expected_result]
+
+
+_repeat_int_cases = (
+    ('zero_reps', [], 0, 1000000, False, False, False, {}),
+    ('raw_zero_iters', [], 5, 0, False, False, True, {}), 
+    ('few_reps_and_iters', [], 3, 5, False, False, False, {}),
+    ('raw_results', [], 3, 5, False, False, True, {}),
+    ('callable_stmt', [], 3, 5, True, False, False, {}),
+    ('callable_setup', [], 3, 5, False, True, False, {}),
+    ('callable_stmt_and_setup', [], 3, 5, True, True, False, {})
 )
 
 
 @parametrize(_method_options, 'use_function')
 @parametrize(
-    _repeat_cases, 'callable_stmt', 'callable_setup', 'kwargs', globals=None
+    _repeat_int_cases, 'trials', 'iterations',
+    'callable_stmt', 'callable_setup', 'raw'
 )
-def test_repeat_method(
-    fake_timer, callable_stmt, callable_setup, kwargs, globals, use_function
+def test_repeat_method_int(
+    fake_timer,
+    trials, iterations, callable_stmt, callable_setup, raw,
+    use_function
 ):
     stmt = fake_timer.inc if callable_stmt else fake_stmt
     setup = fake_timer.setup if callable_setup else fake_setup
-    expected_iterations = kwargs.get('iterations', DEFAULT_ITERATIONS)
-    trials = kwargs.get('trials', DEFAULT_TRIALS)
-    if use_function:
-        result = timeit.repeat(stmt, setup, fake_timer, globals, **kwargs)
-    else:
-        t = timeit.Timer(stmt, setup, fake_timer, globals)
-        result = t.repeat(**kwargs)
-    assert fake_timer.setup_calls == trials
-    assert fake_timer.count == trials * expected_iterations
-    callback = kwargs.get('callback', None)
-    assert result == trials * [expected_time(expected_iterations, callback)]
+    kwargs = {'iterations': iterations}
+    if raw:
+        kwargs['callback'] = 'raw'
+    _do_repeat_method_test(
+        stmt, setup, fake_timer, trials, use_function, kwargs,
+        iterations, trials * iterations, raw
+    )
 
 
 # AUTORANGE
@@ -245,7 +243,7 @@ def test_autorange(
 def test_print_exc(capsys):
     t = timeit.Timer("1/0")
     try:
-        t.timeit()
+        t.timeit(1)
     except:
         t.print_exc()
     assert_exc_string(capsys.readouterr().err, 'ZeroDivisionError')
