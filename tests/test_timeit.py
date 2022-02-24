@@ -2,7 +2,7 @@
 import sys
 # pytest
 from pytest import fixture, mark
-slow, skipif = mark.slow, mark.skipif
+slow, skipif, xfail = mark.slow, mark.skipif, mark.xfail
 del mark
 # test infrastructure
 from .infrastructure import parametrize, raises
@@ -304,11 +304,23 @@ def test_timeit_globals_args():
 # MAIN FUNCTION
 
 
+_usage = """\
+usage: timeit [-h] [-i ITERATIONS] [-u {sec,msec,usec,nsec}]
+              [-s SETUP [SETUP ...]] [-t TRIALS] [-p] [-v]
+              [stmt [stmt ...]]"""
+_error = "timeit: error:"
+_bad_switch_msg = f"{_usage}\n{_error} unrecognized arguments: --bad-switch\n"
+_invalid_unit = "argument -u/--unit: invalid choice:"
+_parsec_choice = "'parsec' (choose from 'sec', 'msec', 'usec', 'nsec')"
+_bad_unit_msg = f"{_usage}\n{_error} {_invalid_unit} {_parsec_choice}\n"
+_invalid_trials = "argument -t/--trials: invalid _positive_int value:"
+_bad_reps_msg = f"{_usage}\n{_error} {_invalid_trials} '-5'\n"
+
+
 _main_out_cases = (
     (
         'bad_switch', [], 1.0, ['--bad-switch'],
-        'option --bad-switch not recognized\n' +
-        'use -h/--help for command line help\n', {'verify': 'err'}
+        _bad_switch_msg, {'verify': 'err'}
     ), (
         'seconds', [], 5.5, [],
         "1 loop, best of 5: 5.5 sec per loop\n", {}
@@ -316,30 +328,29 @@ _main_out_cases = (
         'milliseconds', [], 0.0055, [],
         "50 loops, best of 5: 5.5 msec per loop\n", {}
     ), (
-        'microseconds', [], 0.000_0025, ['-n100'],
+        'microseconds', [], 0.000_0025, ['-i100'],
         "100 loops, best of 5: 2.5 usec per loop\n", {}
     ), (
-        'fixed_iters', [], 2.0, ['-n35'],
+        'fixed_iters', [], 2.0, ['-i35'],
         "35 loops, best of 5: 2 sec per loop\n", {}
     ), (
-        'setup', [], 2.0, ['-n35', '-s', 'print("CustomSetup")'],
+        'setup', [], 2.0, ['-i35', '-s', 'print("CustomSetup")'],
         "CustomSetup\n" * DEFAULT_TRIALS +
         "35 loops, best of 5: 2 sec per loop\n", {}
     ), (
         'multiple_setups', [],
-        2.0, ['-n35', '-s', 'a = "CustomSetup"', '-s', 'print(a)'],
+        2.0, ['-i35', '-s', 'a = "CustomSetup"', 'print(a)'],
         "CustomSetup\n" * DEFAULT_TRIALS +
         "35 loops, best of 5: 2 sec per loop\n", {}
     ), (
-        'fixed_reps', [], 60.0, ['-r9'],
+        'fixed_reps', [], 60.0, ['-t9'],
         "1 loop, best of 9: 60 sec per loop\n", {}
     ), (
-        'negative_reps', [], 60.0, ['-r-5'],
-        "1 loop, best of 1: 60 sec per loop\n", {}
-    ), (
-        'help', [skipif(sys.flags.optimize >= 2, reason="need __doc__")],
-        1.0, ['-h'], timeit.__doc__, {}
-    ), (
+        'negative_reps', [], 60.0, ['-t-5'],
+        _bad_reps_msg, {'verify': 'err'}
+    ),
+    # We don't need to test -h; that's built-in argparse stuff
+    (
         'verbose', [], 1.0, ['-v'],
         '1 loop -> 1 secs\n\n' +
         'raw times: 1 sec, 1 sec, 1 sec, 1 sec, 1 sec\n\n' +
@@ -375,13 +386,12 @@ _main_out_cases = (
         "100 loops, best of 5: 3e+06 nsec per loop\n", {}
     ), (
         'time_parsec', [], 0.003, ['-u', 'parsec'],
-        'Unrecognized unit. Please select nsec, usec, msec, or sec.\n',
-        {'verify': 'err'}
+        _bad_unit_msg, {'verify': 'err'}
     ), (
         'exception', [], 1.0, ['1/0'],
         'ZeroDivisionError', {'verify': 'exc'}
     ), (
-        'exception_fixed_reps', [], 1.0, ['-n1', '1/0'],
+        'exception_fixed_reps', [], 1.0, ['-i1', '1/0'],
         'ZeroDivisionError', {'verify': 'exc'}
     )
 )
@@ -394,7 +404,7 @@ def test_main_out(
     capsys, fake_timer, expected, seconds_per_call, switches, verify
 ):
     fake_timer.seconds_per_call = seconds_per_call
-    args = switches + [fake_stmt]
+    args = switches + ['--', fake_stmt]
     # timeit.main() modifies sys.path, so save and restore it.
     orig_sys_path = sys.path[:]
     timeit.main(args=args, _wrap_timer=lambda timer:fake_timer)

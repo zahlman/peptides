@@ -9,28 +9,7 @@ To measure the timing overhead, try invoking the program without arguments.
 
 Library usage: see the Timer class.
 
-Command line usage:
-    python timeit.py [-n N] [-r N] [-s S] [-p] [-h] [--] [statement]
-
-Options:
-  -n/--number N: how many times to execute 'statement' (default: see below)
-  -r/--repeat N: how many times to repeat the timer (default 5)
-  -s/--setup S: statement to be executed once initially (default 'pass').
-                Execution of this setup statement is NOT timed.
-  -p/--process: use time.process_time() (default is time.perf_counter())
-  -v/--verbose: print raw timing results; repeat for more digits precision
-  -u/--unit: set the output time unit (nsec, usec, msec, or sec)
-  -h/--help: print this usage message and exit
-  --: separate options from statement, use when statement starts with -
-  statement: statement to be timed (default 'pass')
-
-A multi-line statement may be given by specifying each line as a separate
-argument; indented lines are possible by enclosing an argument in quotes and
-using leading spaces. Multiple -s options are treated similarly.
-
-If -n is not given, a suitable number of loops is calculated by trying
-increasing numbers from the sequence 1, 2, 5, 10, 20, 50, ... until the
-total time is at least 0.2 seconds.
+Command-line usage: see `timeit -h`.
 
 Classes:
 
@@ -38,25 +17,25 @@ Classes:
 
 Functions:
 
-    timeit(string, string) -> float
-    repeat(string, string) -> list
+    autorange(float) -> generator[int]
     default_timer() -> float
+    repeat(string, string) -> list
+    timeit(string, string) -> float
 """
 
 
-import gc, getopt, itertools, linecache, os, sys, time, traceback, warnings
-from functools import partial
+import argparse, gc, itertools, linecache, os, sys, time, traceback, warnings
 from .generator_feedback import feedback
 
 
-__all__ = ["Timer", "timeit", "repeat", "default_timer"]
+__all__ = ["Timer", "autorange", "default_timer", "repeat", "timeit"]
 
 
 dummy_src_name = "<timeit-src>"
-_default_trials = 5 # used for CLI and testing, not programmatically
 default_timer = time.perf_counter
 
 
+_default_trials = 5 # used for CLI and testing, not programmatically
 _globals = globals
 _units = ((1.0, 'sec'), (1e-3, 'msec'), (1e-6, 'usec'), (1e-9, "nsec"))
 _unit_names = tuple(u[1] for u in _units)
@@ -65,7 +44,7 @@ _unit_names = tuple(u[1] for u in _units)
 # Don't change the indentation of the template; the reindent() calls
 # in Timer.__init__() depend on setup being indented 4 spaces and stmt
 # being indented 8 spaces.
-template = """
+template = """\
 def inner(_it, _timer{init}):
     {setup}
     _t0 = _timer()
@@ -250,96 +229,88 @@ def repeat(
     return t.repeat(trials, iterations=iterations, callback=callback)
 
 
-def _bailout(*messages):
-    print(*messages, sep='\n', file=sys.stderr)
-    return 2
+def _positive_int(s):
+    result = int(s)
+    if result < 1:
+        raise ValueError('count must be at least 1')
+    return result
+
+
+epilog = """\
+A multi-line statement may be given by specifying each line as a separate
+argument; indented lines are possible by enclosing an argument in quotes and
+using leading spaces. Multiple -s options are treated similarly.
+
+If -n is not given, a suitable number of loops is calculated by trying
+increasing numbers from the sequence 1, 2, 5, 10, 20, 50, ... until the
+total time is at least 0.2 seconds.
+"""
 
 
 def _parse_args(args):
-    if args is None:
-        args = sys.argv[1:]
-    try:
-        opts, args = getopt.getopt(
-            args, "n:u:s:r:pvh", [
-                "number=", "unit=", "setup=", "repeat=",
-                "process", "verbose", "help"
-            ]
-        )
-    except getopt.error as err:
-        return _bailout(err, "use -h/--help for command line help")
-    # Process individual arguments.
-    timer = default_timer
-    number = 0 # auto-determine
-    setup = []
-    repeat = _default_trials
-    verbose = 0
-    unit_name = None
-    precision = 3
-    for o, a in opts:
-        if o in ("-n", "--number"):
-            number = int(a)
-        if o in ("-s", "--setup"):
-            setup.append(a)
-        if o in ("-u", "--unit"):
-            if a in _unit_names:
-                unit_name = a
-            else:
-                return _bailout(
-                    "Unrecognized unit. Please select nsec, usec, msec, or sec.",
-                )
-        if o in ("-r", "--repeat"):
-            repeat = max(int(a), 1)
-        if o in ("-p", "--process"):
-            timer = time.process_time
-        if o in ("-v", "--verbose"):
-            if verbose:
-                precision += 1
-            verbose += 1
-        if o in ("-h", "--help"):
-            print(__doc__, end='')
-            return 0
-    return {
-        'stmt': '\n'.join(args) if args else 'pass',
-        'setup': '\n'.join(setup) if setup else 'pass',
-        'timer': timer, 'number': number, 'repeat': repeat,
-        'verbose': verbose, 'precision': precision, 'unit_name': unit_name
-    }
+    parser = argparse.ArgumentParser(
+        prog='timeit', description='TODO', epilog=epilog
+    )
+    parser.add_argument(
+        '-i', '--iterations', type=_positive_int,
+        help='number of iterations to run per timing trial\n(default: see below)'
+    )
+    parser.add_argument(
+        '-u', '--unit', choices=_unit_names,
+        help='set the output time unit (nsec, usec, msec, or sec)'
+    )
+    parser.add_argument(
+        '-s', '--setup', nargs='+', default=['pass'],
+        help="setup code to run before `stmt` (default 'pass').\n" +
+        "Execution of this statement is NOT timed."
+    )
+    parser.add_argument(
+        '-t', '--trials', type=_positive_int, default=_default_trials,
+        help=f'how many timing trials to run (default {_default_trials})'
+    )
+    parser.add_argument(
+        '-p', '--process', action='store_const', dest='timer',
+        const=time.process_time, default=default_timer,
+        help='use `time.process_time` for timing (default is `time.perf_counter`)'
+    )
+    parser.add_argument(
+        '-v', '--verbose', action='count', default=0,
+        help='display raw timing results; repeat for more digits precision'
+    )
+    parser.add_argument(
+        'stmt', nargs='*', default=['pass'],
+        help="statement to be timed (default 'pass')"
+    )
+    return parser.parse_args(args)
 
 
-def _autorange_callback(verbose, precision, time_taken, number):
-    if verbose:
+def _verbose_auto_number(timer, precision):
+    def _callback(time_taken, number):
         s = '' if (number == 1) else 's'
         print(f"{number} loop{s} -> {time_taken:.{precision}g} secs")
-    return time_taken, number
-
-
-def _auto_number(t, verbose, precision):
-    callback = partial(_autorange_callback, verbose, precision)
-    count = t.repeat(autorange(0.2), callback=callback)[-1][1]
-    if verbose:
-        print()
+        return time_taken, number
+    count = timer.repeat(autorange(0.2), callback=_callback)[-1][1]
+    print()
     return count
+
+
+def _plain_auto_number(timer):
+    return timer.repeat(autorange(0.2), callback='raw')[-1][1]
 
 
 def format_time(precision, desired_name, dt):
     for scale, name in _units:
         if name == desired_name or (desired_name is None and dt >= scale):
             return f"{dt/scale:.{precision}g} {name}"
-    else:
-        assert False
+    assert False
 
 
-def print_stats(number, repeat, raw_timings, verbose, precision, unit_name):
-    if verbose:
-        print("raw times:", ", ".join(
-            format_time(precision, unit_name, dt[0]) for dt in raw_timings
-        ), end='\n\n')
-    timings = [dt / count for dt, count in raw_timings]
+def print_stats(timings, trials, iterations, precision, unit):
     best, worst = min(timings), max(timings)
-    formatted_best = format_time(precision, unit_name, best)
-    formatted_worst = format_time(precision, unit_name, worst)
-    s = '' if number == 1 else 's'
-    print(f"{number} loop{s}, best of {repeat}: {formatted_best} per loop")
+    formatted_best = format_time(precision, unit, best)
+    formatted_worst = format_time(precision, unit, worst)
+    s = '' if iterations == 1 else 's'
+    print(f"{iterations} loop{s}, best of {trials}: {formatted_best} per loop")
     if worst >= best * 4:
         msg_1 = "The test results are likely unreliable. The worst time"
         msg_2 = "was more than four times slower than the best time"
@@ -349,17 +320,40 @@ def print_stats(number, repeat, raw_timings, verbose, precision, unit_name):
         )
 
 
-def run(stmt, setup, timer, number, repeat, verbose, precision, unit_name):
-    t = Timer(stmt, setup, timer)
+def run_verbose(timer, trials, iterations, precision, unit):
     try:
-        if number == 0:
-            number = _auto_number(t, verbose, precision)
-        raw_timings = t.repeat(repeat, iterations=number, callback='raw')
+        if iterations is None:
+            iterations = _verbose_auto_number(timer, precision)
+        raw_timings = timer.repeat(trials, iterations=iterations, callback='raw')
     except:
-        t.print_exc()
+        timer.print_exc()
         return 1
-    print_stats(number, repeat, raw_timings, verbose, precision, unit_name)
+    print("raw times:", ", ".join(
+        format_time(precision, unit, dt[0]) for dt in raw_timings
+    ), end='\n\n')
+    timings = [dt / count for dt, count in raw_timings]
+    print_stats(timings, trials, iterations, precision, unit)
     return 0
+
+
+def run_plain(timer, trials, iterations, precision, unit):
+    try:
+        if iterations is None:
+            iterations = _plain_auto_number(timer)
+        timings = timer.repeat(trials, iterations=iterations)
+    except:
+        timer.print_exc()
+        return 1
+    print_stats(timings, trials, iterations, precision, unit)
+    return 0
+
+
+def run(args):
+    timer = Timer('\n'.join(args.stmt), '\n'.join(args.setup), args.timer)
+    trials, iterations, unit = args.trials, args.iterations, args.unit
+    precision = 3 if args.verbose == 0 else 2 + args.verbose
+    func = run_verbose if args.verbose else run_plain
+    return func(timer, trials, iterations, precision, unit)
 
 
 def main(args=None, *, _wrap_timer=None):
@@ -379,17 +373,20 @@ def main(args=None, *, _wrap_timer=None):
     is not None, it must be a callable that accepts a timer function
     and returns another timer function (used for unit testing).
     """
-    args = _parse_args(args)
-    if isinstance(args, int):
-        return args
+    try:
+        args = _parse_args(args)
+    except SystemExit as e:
+        # Convert to a return code and then let the top-level code exit again.
+        # This is mainly a hack for testing to work around argparse.
+        return e.code
     # Include the current directory, so that local imports work (sys.path
     # contains the directory of this script, rather than the current
     # directory)
     sys.path.insert(0, os.curdir)
     # Allow test code to replace the timer other than via the command line.
     if _wrap_timer is not None:
-        args['timer'] = _wrap_timer(args['timer'])
-    return run(**args)
+        args.timer = _wrap_timer(args.timer)
+    return run(args)
 
 
 if __name__ == "__main__":
