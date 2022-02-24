@@ -51,11 +51,6 @@ def assert_exc_string(exc_string, expected_exc_name):
     assert exc_lines[-1].startswith(expected_exc_name)
 
 
-def expected_time(expected_iterations, callback):
-    raw = (callback == 'raw')
-    return (float(expected_iterations), expected_iterations) if raw else 1.0
-
-
 # TIMER CLASS CREATION
 
 
@@ -129,8 +124,10 @@ def test_timeit_method(
         result = timer.timeit(iterations, **kwargs)
     assert fake_timer.setup_calls == 1
     assert fake_timer.count == iterations
-    callback = kwargs.get('callback', None)
-    assert result == expected_time(iterations, callback)
+    if kwargs.get('callback', None) == 'raw':
+        assert result == (float(iterations), iterations)
+    else:
+        assert result == 1.0
 
 
 # REPEAT METHOD (AND FUNCTION)
@@ -138,7 +135,7 @@ def test_timeit_method(
 
 def _do_repeat_method_test(
     stmt, setup, timer, trials, use_function, kwargs,
-    last_iterations, total_iterations, raw
+    trial_count, iteration_counts, raw
 ):
     if use_function:
         result = timeit.repeat(
@@ -147,15 +144,17 @@ def _do_repeat_method_test(
     else:
         t = timeit.Timer(stmt, setup, timer, None)
         result = t.repeat(trials, **kwargs)
-    assert timer.setup_calls == trials
-    assert timer.count == total_iterations
-    expected_result = (float(last_iterations), last_iterations) if raw else 1.0
-    assert result == trials * [expected_result]
+    assert timer.setup_calls == trial_count
+    assert timer.count == sum(iteration_counts)
+    assert result == [
+        (float(i), i) if raw else 1.0
+        for i in iteration_counts
+    ]
 
 
 _repeat_int_cases = (
     ('zero_reps', [], 0, 1000000, False, False, False, {}),
-    ('raw_zero_iters', [], 5, 0, False, False, True, {}), 
+    ('raw_zero_iters', [], 5, 0, False, False, True, {}),
     ('few_reps_and_iters', [], 3, 5, False, False, False, {}),
     ('raw_results', [], 3, 5, False, False, True, {}),
     ('callable_stmt', [], 3, 5, True, False, False, {}),
@@ -181,7 +180,37 @@ def test_repeat_method_int(
         kwargs['callback'] = 'raw'
     _do_repeat_method_test(
         stmt, setup, fake_timer, trials, use_function, kwargs,
-        iterations, trials * iterations, raw
+        trials, [iterations] * trials, raw
+    )
+
+
+_repeat_range_cases = (
+    ('zero_reps', [], (), False, False, False, {}),
+    ('raw_zero_iters', [], (0, 0, 0, 0, 0), False, False, True, {}),
+    ('few_reps_and_iters', [], range(1, 6), False, False, False, {}),
+    ('raw_results', [], range(3, 6), False, False, True, {}),
+    ('callable_stmt', [], range(3, 6), True, False, False, {}),
+    ('callable_setup', [], range(3, 6), False, True, False, {}),
+    ('callable_stmt_and_setup', [], range(3, 6), True, True, False, {})
+)
+
+
+@parametrize(_method_options, 'use_function')
+@parametrize(
+    _repeat_range_cases, 'trials',
+    'callable_stmt', 'callable_setup', 'raw'
+)
+def test_repeat_method_int(
+    fake_timer,
+    trials, callable_stmt, callable_setup, raw,
+    use_function
+):
+    stmt = fake_timer.inc if callable_stmt else fake_stmt
+    setup = fake_timer.setup if callable_setup else fake_setup
+    kwargs = {'callback': 'raw'} if raw else {}
+    _do_repeat_method_test(
+        stmt, setup, fake_timer, trials, use_function, kwargs,
+        len(trials), trials, raw
     )
 
 
