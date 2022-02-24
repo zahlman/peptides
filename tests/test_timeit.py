@@ -173,13 +173,13 @@ def test_repeat_method_int(
     trials, iterations, callable_stmt, callable_setup, raw,
     use_function
 ):
-    stmt = fake_timer.inc if callable_stmt else fake_stmt
-    setup = fake_timer.setup if callable_setup else fake_setup
     kwargs = {'iterations': iterations}
     if raw:
         kwargs['callback'] = 'raw'
     _do_repeat_method_test(
-        stmt, setup, fake_timer, trials, use_function, kwargs,
+        fake_timer.inc if callable_stmt else fake_stmt,
+        fake_timer.setup if callable_setup else fake_setup,
+        fake_timer, trials, use_function, kwargs,
         trials, [iterations] * trials, raw
     )
 
@@ -205,11 +205,11 @@ def test_repeat_method_int(
     trials, callable_stmt, callable_setup, raw,
     use_function
 ):
-    stmt = fake_timer.inc if callable_stmt else fake_stmt
-    setup = fake_timer.setup if callable_setup else fake_setup
-    kwargs = {'callback': 'raw'} if raw else {}
     _do_repeat_method_test(
-        stmt, setup, fake_timer, trials, use_function, kwargs,
+        fake_timer.inc if callable_stmt else fake_stmt,
+        fake_timer.setup if callable_setup else fake_setup,
+        fake_timer, trials, use_function,
+        {'callback': 'raw'} if raw else {},
         len(trials), trials, raw
     )
 
