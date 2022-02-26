@@ -143,8 +143,9 @@ def _parse_time_func(s):
 def run(args):
     try:
         time_func = _parse_time_func(args.timer)
-    except:
-        print('Timer lookup/creation failed.', file=sys.stderr)
+    except Exception as e:
+        print('Timer lookup/creation failed:', file=sys.stderr)
+        print(e, file=sys.stderr)
         return 2
     timer = Timer('\n'.join(args.stmt), '\n'.join(args.setup), time_func)
     trials, iterations, unit = args.trials, args.iterations, args.unit
