@@ -1,4 +1,4 @@
-import argparse, os, sys, time
+import argparse, importlib, os, sys, time
 from . import autorange, default_timer, Timer
 
 
@@ -47,9 +47,8 @@ def _parse_args(args):
         help=f'how many timing trials to run (default {_default_trials})'
     )
     parser.add_argument(
-        '-p', '--process', action='store_const', dest='timer',
-        const=time.process_time, default=default_timer,
-        help='use `time.process_time` for timing (default is `time.perf_counter`)'
+        '-p', '--process', dest='timer', default=default_timer,
+        help='timer to use (may be instantiated with no arguments)'
     )
     parser.add_argument(
         '-v', '--verbose', action='count', default=0,
@@ -126,8 +125,28 @@ def run_plain(timer, trials, iterations, precision, unit):
     return 0
 
 
+def _parse_time_func(s):
+    if callable(s):
+        return s
+    assert isinstance(s, str)
+    instantiate = s.endswith('()')
+    if instantiate:
+        s = s[:-2]
+    module_name, dot, func_name = s.rpartition('.')
+    module = importlib.import_module(module_name)
+    result = getattr(module, func_name)
+    if instantiate:
+        result = result()
+    return result
+
+
 def run(args):
-    timer = Timer('\n'.join(args.stmt), '\n'.join(args.setup), args.timer)
+    try:
+        time_func = _parse_time_func(args.timer)
+    except:
+        print('Timer lookup/creation failed.', file=sys.stderr)
+        return 2
+    timer = Timer('\n'.join(args.stmt), '\n'.join(args.setup), time_func)
     trials, iterations, unit = args.trials, args.iterations, args.unit
     precision = 3 if args.verbose == 0 else 2 + args.verbose
     func = run_verbose if args.verbose else run_plain

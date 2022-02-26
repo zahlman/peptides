@@ -36,6 +36,11 @@ class FakeTimer:
         self.setup_calls += 1
 
 
+_slow_timer = FakeTimer()
+def slow_timer():
+    return _slow_timer
+
+
 @fixture
 def fake_timer():
     # Put the timer instance somewhere that can be accessed globally,
@@ -307,7 +312,7 @@ def test_timeit_globals_args():
 
 _usage = """\
 usage: timeit [-h] [-i ITERATIONS] [-u {sec,msec,usec,nsec}]
-              [-s SETUP [SETUP ...]] [-t TRIALS] [-p] [-v]
+              [-s SETUP [SETUP ...]] [-t TRIALS] [-p TIMER] [-v]
               [stmt [stmt ...]]"""
 _error = "timeit: error:"
 _bad_switch_msg = f"{_usage}\n{_error} unrecognized arguments: --bad-switch\n"
