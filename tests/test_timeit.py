@@ -12,8 +12,8 @@ from peptides.timeit.ui import main
 
 
 DEFAULT_TRIALS = 5
-fake_setup = "from tests.test_timeit import fake_timer\nfake_timer.setup()"
-fake_stmt = "from tests.test_timeit import fake_timer\nfake_timer.inc()"
+fake_setup = "_fake_timer.setup()"
+fake_stmt = "_fake_timer.inc()"
 
 
 class FakeTimer:
@@ -38,10 +38,9 @@ class FakeTimer:
 
 @fixture
 def publish_fake_timer():
-    global fake_timer
-    fake_timer = FakeTimer()
+    timeit._fake_timer = FakeTimer()
     yield
-    del fake_timer
+    del timeit._fake_timer
 
 
 def assert_exc_string(exc_string, expected_exc_name):
@@ -112,6 +111,7 @@ def test_timeit_method(
     iterations, callable_stmt, callable_setup, kwargs,
     use_function
 ):
+    fake_timer = timeit._fake_timer
     stmt = fake_timer.inc if callable_stmt else fake_stmt
     setup = fake_timer.setup if callable_setup else fake_setup
     if use_function:
@@ -173,6 +173,7 @@ def test_repeat_method_int(
     trials, iterations, callable_stmt, callable_setup, raw,
     use_function
 ):
+    fake_timer = timeit._fake_timer
     kwargs = {'iterations': iterations}
     if raw:
         kwargs['callback'] = 'raw'
@@ -205,6 +206,7 @@ def test_repeat_method_int(
     trials, callable_stmt, callable_setup, raw,
     use_function
 ):
+    fake_timer = timeit._fake_timer
     _do_repeat_method_test(
         fake_timer.inc if callable_stmt else fake_stmt,
         fake_timer.setup if callable_setup else fake_setup,
@@ -253,6 +255,7 @@ def test_autorange(
     capsys, publish_fake_timer,
     seconds_per_call, num_loops, time_taken, callback, expected
 ):
+    fake_timer = timeit._fake_timer
     fake_timer.seconds_per_call = seconds_per_call
     t = timeit.Timer(stmt=fake_stmt, setup=fake_setup, timer=fake_timer)
     results = t.repeat(timeit.autorange(0.2), callback=callback)
@@ -404,8 +407,9 @@ _main_out_cases = (
 def test_main_out(
     capsys, publish_fake_timer, expected, seconds_per_call, switches, verify
 ):
+    fake_timer = timeit._fake_timer
     fake_timer.seconds_per_call = seconds_per_call
-    timeflag = ['-p', 'tests.test_timeit.fake_timer']
+    timeflag = ['-p', 'peptides.timeit._fake_timer']
     args = timeflag + switches + ['--', fake_stmt]
     # timeit.main() modifies sys.path, so save and restore it.
     orig_sys_path = sys.path[:]
