@@ -154,7 +154,7 @@ def run(args):
     return func(timer, trials, iterations, precision, unit)
 
 
-def main(args=None, *, _wrap_timer=None):
+def main(args=None):
     """Main program, used when run as a script.
 
     `args` -> sequence of str
@@ -166,10 +166,6 @@ def main(args=None, *, _wrap_timer=None):
     stderr and the return value is 1. If argument parsing with `argparse`
     fails, that return value is forwarded. Exceptions at other times
     (including the template compilation) are not caught.
-
-    '_wrap_timer' is an internal interface used for unit testing.  If it
-    is not None, it must be a callable that accepts a timer function
-    and returns another timer function (used for unit testing).
     """
     try:
         args = _parse_args(args)
@@ -181,7 +177,4 @@ def main(args=None, *, _wrap_timer=None):
     # contains the directory of this script, rather than the current
     # directory)
     sys.path.insert(0, os.curdir)
-    # Allow test code to replace the timer other than via the command line.
-    if _wrap_timer is not None:
-        args.timer = _wrap_timer(args.timer)
     return run(args)
