@@ -8,9 +8,10 @@ del mark
 from .infrastructure import parametrize, raises
 # code under test
 from peptides import timeit # test our version, not the standard library
+from peptides.timeit.ui import main
 
 
-DEFAULT_TRIALS = timeit._default_trials
+DEFAULT_TRIALS = 5
 fake_setup = "from peptides import timeit\ntimeit._fake_timer.setup()"
 fake_stmt = "from peptides import timeit\ntimeit._fake_timer.inc()"
 
@@ -407,7 +408,7 @@ def test_main_out(
     args = switches + ['--', fake_stmt]
     # timeit.main() modifies sys.path, so save and restore it.
     orig_sys_path = sys.path[:]
-    timeit.main(args=args, _wrap_timer=lambda timer:fake_timer)
+    main(args=args, _wrap_timer=lambda timer:fake_timer)
     sys.path[:] = orig_sys_path[:]
     # Validate stdout and stderr results.
     result = capsys.readouterr()
