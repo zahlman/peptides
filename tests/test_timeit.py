@@ -12,8 +12,8 @@ from peptides.timeit.ui import main
 
 
 DEFAULT_TRIALS = 5
-fake_setup = "from peptides import timeit\ntimeit._fake_timer.setup()"
-fake_stmt = "from peptides import timeit\ntimeit._fake_timer.inc()"
+fake_setup = "from tests.test_timeit import fake_timer\nfake_timer.setup()"
+fake_stmt = "from tests.test_timeit import fake_timer\nfake_timer.inc()"
 
 
 class FakeTimer:
@@ -36,18 +36,12 @@ class FakeTimer:
         self.setup_calls += 1
 
 
-_slow_timer = FakeTimer()
-def slow_timer():
-    return _slow_timer
-
-
 @fixture
-def fake_timer():
-    # Put the timer instance somewhere that can be accessed globally,
-    # from dynamically compiled code, without worrying about globals.
-    timeit._fake_timer = FakeTimer()
-    yield timeit._fake_timer
-    del timeit._fake_timer
+def publish_fake_timer():
+    global fake_timer
+    fake_timer = FakeTimer()
+    yield
+    del fake_timer
 
 
 def assert_exc_string(exc_string, expected_exc_name):
@@ -114,7 +108,7 @@ _method_options = (('method', [], False, {}), ('function', [], True, {}))
     _timeit_cases, 'iterations', 'callable_stmt', 'callable_setup', 'kwargs'
 )
 def test_timeit_method(
-    fake_timer,
+    publish_fake_timer,
     iterations, callable_stmt, callable_setup, kwargs,
     use_function
 ):
@@ -175,7 +169,7 @@ _repeat_int_cases = (
     'callable_stmt', 'callable_setup', 'raw'
 )
 def test_repeat_method_int(
-    fake_timer,
+    publish_fake_timer,
     trials, iterations, callable_stmt, callable_setup, raw,
     use_function
 ):
@@ -207,7 +201,7 @@ _repeat_range_cases = (
     'callable_stmt', 'callable_setup', 'raw'
 )
 def test_repeat_method_int(
-    fake_timer,
+    publish_fake_timer,
     trials, callable_stmt, callable_setup, raw,
     use_function
 ):
@@ -256,7 +250,7 @@ _autorange_cases = (
     callback='raw', expected=''
 )
 def test_autorange(
-    capsys, fake_timer,
+    capsys, publish_fake_timer,
     seconds_per_call, num_loops, time_taken, callback, expected
 ):
     fake_timer.seconds_per_call = seconds_per_call
@@ -290,7 +284,7 @@ def test_print_exc(capsys):
 def test_timeit_globals_args():
     # This time, we don't use the fixture because the code is testing
     # the use of globals and shouldn't be able to "cheat" by getting at
-    # timeit._fake_timer instead.
+    # fake_timer instead.
     global _global_timer
     _global_timer = FakeTimer()
     t = timeit.Timer(stmt='_global_timer.inc()', timer=_global_timer)
@@ -305,6 +299,7 @@ def test_timeit_globals_args():
         stmt='local_timer.inc()', timer=local_timer,
         globals=locals(), iterations=3
     )
+    del _global_timer
 
 
 # MAIN FUNCTION
@@ -407,13 +402,14 @@ _main_out_cases = (
     _main_out_cases, 'seconds_per_call', 'switches', 'expected', verify=None
 )
 def test_main_out(
-    capsys, fake_timer, expected, seconds_per_call, switches, verify
+    capsys, publish_fake_timer, expected, seconds_per_call, switches, verify
 ):
     fake_timer.seconds_per_call = seconds_per_call
-    args = switches + ['--', fake_stmt]
+    timeflag = ['-p', 'tests.test_timeit.fake_timer']
+    args = timeflag + switches + ['--', fake_stmt]
     # timeit.main() modifies sys.path, so save and restore it.
     orig_sys_path = sys.path[:]
-    main(args=args, _wrap_timer=lambda timer:fake_timer)
+    main(args=args)
     sys.path[:] = orig_sys_path[:]
     # Validate stdout and stderr results.
     result = capsys.readouterr()
