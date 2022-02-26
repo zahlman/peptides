@@ -6,10 +6,9 @@ from pytest import fixture
 from .infrastructure import parametrize, raises
 # code under test
 from peptides import timeit # test our version, not the standard library
-from peptides.timeit.ui import main
+from peptides.timeit.ui import main, _default_trials as DEFAULT_TRIALS
 
 
-DEFAULT_TRIALS = 5
 fake_setup = "_fake_timer.setup()"
 fake_stmt = "_fake_timer.inc()"
 
