@@ -1,9 +1,7 @@
 # standard library
 import sys
 # pytest
-from pytest import fixture, mark
-slow, skipif, xfail = mark.slow, mark.skipif, mark.xfail
-del mark
+from pytest import fixture
 # test infrastructure
 from .infrastructure import parametrize, raises
 # code under test
