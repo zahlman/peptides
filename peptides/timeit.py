@@ -57,26 +57,29 @@ def inner(_it, _timer{init}):
 
 
 def _reindent(src, indent):
-    """Helper to reindent a multi-line statement."""
     return src.replace("\n", "\n" + " "*indent)
 
 
 class Timer:
     """Class for timing execution speed of small code snippets.
 
-    The constructor takes a statement to be timed, an additional
-    statement used for setup, and a timer function.  Both statements
-    default to 'pass'; the timer function is platform-dependent (see
-    module doc string).  If 'globals' is specified, the code will be
-    executed within that namespace (as opposed to inside timeit's
-    namespace).
+    stmt -> string or callable giving the code that will be timed.
+    setup -> string or callable giving additional setup code.
+    timer -> callable used for timing. Defaults to `time.perf_counter`.
+    If a custom timer is desired, make sure it accepts zero arguments and
+    returns a floating-point value.
+    globals -> dict or None
+    If specified, the code will be executed in that global namespace,
+    instead of the `timeit` module's namespace.
 
-    To measure the execution time of the first statement, use the
-    timeit() method.  The repeat() method is a convenience to call
-    timeit() multiple times and return a list of results.
+    To measure the execution time of `stmt`, use the `timeit` method.
+    The `repeat` method is a convenience to call timeit` multiple times and
+    return a list of results.
 
-    The statements may contain newlines, as long as they don't contain
-    multi-line string literals.
+    `stmt` and `setup` strings may contain newlines, as long as they don't
+    contain multi-line string literals. If strings are used, they will be
+    written directly into a compiled template; if callables are used, the
+    template will call them (it will not try to embed their code).
     """
     def __init__(
         self, stmt="pass", setup="pass", timer=default_timer, globals=None
@@ -118,6 +121,13 @@ class Timer:
     def print_exc(self, file=None):
         """Helper to print a traceback from the timed code.
 
+        The advantage over the standard traceback is that source lines
+        in the compiled template will be displayed.
+        
+        `file` -> file-like object to which the traceback will be written.
+        This argument is forwarded to `traceback.print_exc`; the default
+        is `sys.stderr`.
+
         Typical use:
 
             t = Timer(...)       # outside the try/except
@@ -125,12 +135,6 @@ class Timer:
                 t.timeit(...)    # or t.repeat(...)
             except:
                 t.print_exc()
-
-        The advantage over the standard traceback is that source lines
-        in the compiled template will be displayed.
-
-        The optional file argument directs where the traceback is
-        sent; it defaults to sys.stderr.
         """
         if self.src is not None:
             linecache.cache[dummy_src_name] = (
@@ -143,12 +147,18 @@ class Timer:
     def timeit(self, iterations, *, callback=None):
         """Time several executions of the main statement.
 
-        To be precise, this executes the setup statement once, and
-        then returns the time it takes to execute the main statement
-        a number of times, as a float measured in seconds.  The
-        argument is the number of times through the loop, defaulting
-        to one million.  The main statement, the setup statement and
-        the timer function to be used are passed to the constructor.
+        To be precise, this executes the setup statement once, and then
+        executes the main statement multiple times in a loop, returning
+        information about the amount of time taken.
+
+        `iterations` -> int: the number of times to run the loop.
+        `callback` -> None, 'raw' or a callable
+        If None or not specified, `timeit` returns the average time per
+        iteration. If a callable is given, it will be passed the total time
+        and number of iterations, and its result is returned.
+        For convenience, the string `'raw'` can also be used, in which case
+        the total time and number of iterations are returned as a 2-tuple
+        (equivalent to passing `tuple`).
         """
         it = itertools.repeat(None, iterations)
         gcold = gc.isenabled()
@@ -167,30 +177,52 @@ class Timer:
 
 
     def repeat(self, trials, *, iterations=None, callback=None):
-        """Call timeit() a few times.
+        """Call timeit() multiple times and return a list of results.
 
-        This is a convenience function that calls the timeit()
-        repeatedly, returning a list of results.  The first argument
-        specifies how many times to call timeit(), defaulting to 5;
-        the second argument specifies the timer argument, defaulting
-        to one million.
+        `trials` -> int or iterable
+        If integer, specifies the number of times to call `timeit`.
+        If an iterable, `timeit` will run once for each value, and those
+        values will specify the number of iterations for each trial.
+        In particular, if a generator is used, the results from each call
+        of `timeit` will be fed back to the generator (with `.send`) so
+        that it can respond to interim results.
 
-        Note: it's tempting to calculate mean and standard deviation
-        from the result vector and report these.  However, this is not
-        very useful.  In a typical case, the lowest value gives a
-        lower bound for how fast your machine can run the given code
-        snippet; higher values in the result vector are typically not
-        caused by variability in Python's speed, but by other
-        processes interfering with your timing accuracy.  So the min()
-        of the result is probably the only number you should be
-        interested in.  After that, you should look at the entire
-        vector and apply common sense rather than statistics.
+        Example of `trials` as a generator:
+
+            def run_twice():
+                # Note that if e.g. we use `callback='raw'`, the
+                # assigned value may have a different type and structure.
+                time_taken = yield 1
+                if time_taken > 0.001:
+                    print("A single run takes over a millisecond; aborting.")
+                else:
+                    yield 1000
+
+            my_timer.repeat(run_twice())
+
+        `iterations` -> int
+        If `trials` is an integer, gives the number of iterations to use
+        for each trial. Otherwise, this parameter is ignored.
+
+        `callback` -> as per `timeit`.
+
+        Note: it's tempting to calculate and report the mean and standard
+        deviation of the results in the returned list. However, this is not
+        very useful. In a typical case, the lowest value gives a lower bound
+        for how fast your machine can run the given code snippet; higher
+        values in the result vector are typically not caused by variability
+        in Python's speed, but by other processes interfering with your
+        timing accuracy. So the min() of the result is probably the only
+        number you should be interested in. After that, you should look at
+        the entire list and apply common sense rather than statistics.
         """
         if isinstance(trials, int):
             if iterations is None:
-                raise ValueError('iterations must be given with integer trials')
+                raise ValueError(
+                    '`iterations` must be given when `trials` is an integer'
+                )
             if not isinstance(iterations, int):
-                raise TypeError('iteration count must be integer')
+                raise TypeError('`iterations` must be integer')
             trials = itertools.repeat(iterations, trials)
         return list(
             feedback(trials, lambda t: self.timeit(t, callback=callback))
@@ -198,6 +230,11 @@ class Timer:
 
 
 def autorange(min_time):
+    """A generator that produces iteration counts for `repeat`.
+
+    Yields values from the sequence 1, 2, 5, 10, 20, 50, 100, ...
+    until the time taken by a trial exceeds `min_time`.
+    """
     i = 1
     while True:
         for j in 1, 2, 5:
@@ -359,14 +396,14 @@ def run(args):
 def main(args=None, *, _wrap_timer=None):
     """Main program, used when run as a script.
 
-    The optional 'args' argument specifies the command line to be parsed,
-    defaulting to sys.argv[1:].
+    `args` -> sequence of str
+    The command line to be parsed (defaults to `sys.argv[1]`).
 
-    The return value is an exit code to be passed to sys.exit(); it
-    may be None to indicate success.
+    Returns an exit code to be passed to `sys.exit` (0 indicates success).
 
     When an exception happens during timing, a traceback is printed to
-    stderr and the return value is 1.  Exceptions at other times
+    stderr and the return value is 1. If argument parsing with `argparse`
+    fails, that return value is forwarded. Exceptions at other times
     (including the template compilation) are not caught.
 
     '_wrap_timer' is an internal interface used for unit testing.  If it
