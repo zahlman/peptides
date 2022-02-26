@@ -307,14 +307,14 @@ def test_timeit_globals_args():
 
 _usage = """\
 usage: timeit [-h] [-i ITERATIONS] [-u {sec,msec,usec,nsec}]
-              [-s SETUP [SETUP ...]] [-t TRIALS] [-p TIMER] [-v]
+              [-s SETUP [SETUP ...]] [-c COUNT] [-t TIME_FUNC] [-v]
               [stmt [stmt ...]]"""
 _error = "timeit: error:"
 _bad_switch_msg = f"{_usage}\n{_error} unrecognized arguments: --bad-switch\n"
 _invalid_unit = "argument -u/--unit: invalid choice:"
 _parsec_choice = "'parsec' (choose from 'sec', 'msec', 'usec', 'nsec')"
 _bad_unit_msg = f"{_usage}\n{_error} {_invalid_unit} {_parsec_choice}\n"
-_invalid_trials = "argument -t/--trials: invalid _positive_int value:"
+_invalid_trials = "argument -c/--count: invalid _positive_int value:"
 _bad_reps_msg = f"{_usage}\n{_error} {_invalid_trials} '-5'\n"
 
 
@@ -344,10 +344,10 @@ _main_out_cases = (
         "CustomSetup\n" * DEFAULT_TRIALS +
         "35 loops, best of 5: 2 sec per loop\n", {}
     ), (
-        'fixed_reps', [], 60.0, ['-t9'],
+        'fixed_reps', [], 60.0, ['-c9'],
         "1 loop, best of 9: 60 sec per loop\n", {}
     ), (
-        'negative_reps', [], 60.0, ['-t-5'],
+        'negative_reps', [], 60.0, ['-c-5'],
         _bad_reps_msg, {'verify': 'err'}
     ),
     # We don't need to test -h; that's built-in argparse stuff
@@ -406,7 +406,7 @@ def test_main_out(
 ):
     fake_timer = timeit._fake_timer
     fake_timer.seconds_per_call = seconds_per_call
-    timeflag = ['-p', 'peptides.timeit._fake_timer']
+    timeflag = ['-t', 'peptides.timeit._fake_timer']
     args = timeflag + switches + ['--', fake_stmt]
     # timeit.main() modifies sys.path, so save and restore it.
     orig_sys_path = sys.path[:]

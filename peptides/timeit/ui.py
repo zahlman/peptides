@@ -43,12 +43,12 @@ def _parse_args(args):
         "Execution of this statement is NOT timed."
     )
     parser.add_argument(
-        '-t', '--trials', type=_positive_int, default=_default_trials,
+        '-c', '--count', type=_positive_int, default=_default_trials,
         help=f'how many timing trials to run (default {_default_trials})'
     )
     parser.add_argument(
-        '-p', '--process', dest='timer', default=default_timer,
-        help='timer to use (may be instantiated with no arguments)'
+        '-t', '--time_func', default=default_timer,
+        help='timer function to use (may be instantiated with no arguments)'
     )
     parser.add_argument(
         '-v', '--verbose', action='count', default=0,
@@ -142,13 +142,13 @@ def _parse_time_func(s):
 
 def run(args):
     try:
-        time_func = _parse_time_func(args.timer)
+        time_func = _parse_time_func(args.time_func)
     except Exception as e:
         print('Timer lookup/creation failed:', file=sys.stderr)
         print(e, file=sys.stderr)
         return 2
     timer = Timer('\n'.join(args.stmt), '\n'.join(args.setup), time_func)
-    trials, iterations, unit = args.trials, args.iterations, args.unit
+    trials, iterations, unit = args.count, args.iterations, args.unit
     precision = 3 if args.verbose == 0 else 2 + args.verbose
     func = run_verbose if args.verbose else run_plain
     return func(timer, trials, iterations, precision, unit)
